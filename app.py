@@ -2,28 +2,18 @@ import hashlib
 import requests
 import streamlit as st
 
-st.set_page_config(
-    page_title="ĐI CHƠIIIII",
-    page_icon="⛺",
-    layout="centered",
-)
+st.set_page_config(page_title="ĐI CHƠIIIII", page_icon="⛺", layout="centered")
 
 BIN_ID = "6af5b874ffd5d16053bc0858"
 MASTER_KEY = "$2a$10$EpLPTXlcBTH5/mkxVMBLI.ZSv26QzgFaygkYFHZOa4V7OoVtsot12"
 
 API_URL = "/".join(["https:/", "api.jsonbin.io", "v3", "b", BIN_ID])
-HEADERS = {
-    "Content-Type": "application/json",
-    "X-Master-Key": MASTER_KEY,
-}
+HEADERS = {"Content-Type": "application/json", "X-Master-Key": MASTER_KEY}
 
 st.markdown(
     """
     <style>
-    .stApp {
-        background-color: #0b1120;
-        color: #f8fafc;
-    }
+    .stApp { background-color: #0b1120; color: #f8fafc; }
     .hero-banner {
         background: linear-gradient(135deg, #059669 0%, #2563eb 100%);
         border-radius: 16px;
@@ -49,10 +39,7 @@ st.markdown(
         padding: 14px 18px;
         margin-bottom: 10px;
     }
-    div.stButton > button {
-        border-radius: 10px;
-        font-weight: 600;
-    }
+    div.stButton > button { border-radius: 10px; font-weight: 600; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -267,4 +254,4 @@ with t_req:
     for i, req in enumerate(db["requirements"]):
         r1, r2 = st.columns([4.5, 1])
         with r1:
-            chk = st.checkbox(
+            label_text = f"**{req['task']}** — *(Phụ trách: {req['assigned']})*"
