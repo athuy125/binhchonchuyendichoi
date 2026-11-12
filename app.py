@@ -252,5 +252,5 @@ else:
                 if t_name.strip():
                     load_cloud.clear()
                     current_db = load_cloud()
-                    current_db["requirements"].append({
+                    current_db["requirements"].append( {
                         "task": t_name.strip(),
