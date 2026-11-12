@@ -3,7 +3,7 @@ import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="Dã Ngoại & Sát Hạch 24/11",
+    page_title="ĐI CHƠIIIII",
     page_icon="⛺",
     layout="centered",
 )
@@ -12,7 +12,6 @@ st.set_page_config(
 BIN_ID = "6af5b874ffd5d16053bc0858"
 MASTER_KEY = "$2a$10$EpLPTXlcBTH5/mkxVMBLI.ZSv26QzgFaygkYFHZOa4V7OoVtsot12"
 
-# Dùng join để đảm bảo tuyệt đối không bao giờ bị mất dấu '/'
 API_URL = "/".join(["https:/", "api.jsonbin.io", "v3", "b", BIN_ID])
 HEADERS = {
     "Content-Type": "application/json",
@@ -58,6 +57,8 @@ def make_hash(text: str) -> str:
     return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
 
+# Lưu tạm dữ liệu trong 15 giây để tiết kiệm tối đa 10.000 lượt gọi API
+@st.cache_data(ttl=15, show_spinner=False)
 def load_cloud() -> dict:
     default = {"users": {}, "locations": [], "requirements": []}
     try:
@@ -79,6 +80,8 @@ def save_cloud(data: dict) -> bool:
     try:
         r = requests.put(API_URL, json=data, headers=HEADERS, timeout=10)
         if r.status_code == 200:
+            # Xóa bộ nhớ đệm ngay khi có dữ liệu mới để đồng bộ tức thì
+            load_cloud.clear()
             return True
         st.error(f"Lỗi lưu dữ liệu (Mã {r.status_code}): {r.text}")
         return False
@@ -117,13 +120,17 @@ if st.session_state.user is None:
             if st.form_submit_button("🚀 Vào Hệ Thống", use_container_width=True):
                 if not name or not pwd:
                     st.warning("Vui lòng nhập đủ tên và mật khẩu!")
-                elif name not in db["users"]:
-                    st.error("Tên này chưa đăng ký! Hãy chuyển sang tab Đăng Ký Lần Đầu.")
-                elif db["users"][name] != make_hash(pwd):
-                    st.error("Mật khẩu không đúng!")
                 else:
-                    st.session_state.user = name
-                    st.rerun()
+                    # Tải dữ liệu mới nhất trước khi kiểm tra đăng nhập
+                    load_cloud.clear()
+                    fresh_db = load_cloud()
+                    if name not in fresh_db["users"]:
+                        st.error("Tên này chưa đăng ký! Hãy chuyển sang tab Đăng Ký Lần Đầu.")
+                    elif fresh_db["users"][name] != make_hash(pwd):
+                        st.error("Mật khẩu không đúng!")
+                    else:
+                        st.session_state.user = name
+                        st.rerun()
 
     with tab2:
         with st.form("reg_box"):
@@ -135,14 +142,17 @@ if st.session_state.user is None:
                     st.warning("Không được để trống tên hoặc mật khẩu!")
                 elif r_pwd != r_pwd2:
                     st.error("Mật khẩu xác nhận không khớp!")
-                elif r_name in db["users"]:
-                    st.error("Tên này đã có người đăng ký rồi!")
                 else:
-                    db["users"][r_name] = make_hash(r_pwd)
-                    if save_cloud(db):
-                        st.session_state.user = r_name
-                        st.success("Đăng ký thành công!")
-                        st.rerun()
+                    load_cloud.clear()
+                    fresh_db = load_cloud()
+                    if r_name in fresh_db["users"]:
+                        st.error("Tên này đã có người đăng ký rồi!")
+                    else:
+                        fresh_db["users"][r_name] = make_hash(r_pwd)
+                        if save_cloud(fresh_db):
+                            st.session_state.user = r_name
+                            st.success("Đăng ký thành công!")
+                            st.rerun()
 
 # ==========================================
 # MÀN HÌNH 2: GIAO DIỆN CHÍNH
@@ -150,10 +160,14 @@ if st.session_state.user is None:
 else:
     me = st.session_state.user
 
-    col_a, col_b = st.columns([4, 1.3])
+    col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
     with col_a:
-        st.success(f"🟢 Xin chào **{me}**! Dữ liệu đang đồng bộ trực tuyến.")
+        st.success(f"🟢 Xin chào **{me}**! Đã bật tiết kiệm API.")
     with col_b:
+        if st.button("🔄 Làm mới", use_container_width=True):
+            load_cloud.clear()
+            st.rerun()
+    with col_c:
         if st.button("Thoát", use_container_width=True):
             st.session_state.user = None
             st.rerun()
@@ -180,12 +194,14 @@ else:
                 l_desc = st.text_input("Mô tả / Khoảng cách", placeholder="Đường đẹp, cách trung tâm 40km...")
                 if st.form_submit_button("Thêm Địa Điểm", use_container_width=True):
                     if l_name.strip():
-                        db["locations"].append({
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        current_db["locations"].append({
                             "name": l_name.strip(),
                             "desc": l_desc.strip() or "Chưa có mô tả",
                             "voters": [me],
                         })
-                        if save_cloud(db):
+                        if save_cloud(current_db):
                             st.rerun()
                     else:
                         st.warning("Vui lòng nhập tên địa điểm!")
@@ -207,18 +223,25 @@ else:
                 with c1:
                     btn_text = "✅ Đã Vote (Bấm để hủy)" if voted else "👍 Bầu Chọn"
                     if st.button(btn_text, key=f"vote_{i}", use_container_width=True):
-                        if voted:
-                            voters.remove(me)
-                        else:
-                            voters.append(me)
-                        loc["voters"] = voters
-                        if save_cloud(db):
-                            st.rerun()
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        if i < len(current_db["locations"]):
+                            cur_voters = current_db["locations"][i].get("voters", [])
+                            if me in cur_voters:
+                                cur_voters.remove(me)
+                            else:
+                                cur_voters.append(me)
+                            current_db["locations"][i]["voters"] = cur_voters
+                            if save_cloud(current_db):
+                                st.rerun()
                 with c2:
                     if st.button("🗑️", key=f"del_loc_{i}", use_container_width=True):
-                        db["locations"].pop(i)
-                        if save_cloud(db):
-                            st.rerun()
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        if i < len(current_db["locations"]):
+                            current_db["locations"].pop(i)
+                            if save_cloud(current_db):
+                                st.rerun()
 
     # --- TAB 2: ĐỒ DÙNG ---
     with t_req:
@@ -227,43 +250,7 @@ else:
             t_who = st.text_input("Người nhận việc", value=me)
             if st.form_submit_button("➕ Thêm Vào Danh Sách", use_container_width=True):
                 if t_name.strip():
-                    db["requirements"].append({
+                    load_cloud.clear()
+                    current_db = load_cloud()
+                    current_db["requirements"].append({
                         "task": t_name.strip(),
-                        "assigned": t_who.strip() or "Chưa phân công",
-                        "done": False,
-                    })
-                    if save_cloud(db):
-                        st.rerun()
-                else:
-                    st.warning("Vui lòng nhập tên đồ dùng!")
-
-        st.divider()
-        if not db["requirements"]:
-            st.info("Chưa có đồ dùng nào trong danh sách.")
-
-        for i, req in enumerate(db["requirements"]):
-            r1, r2 = st.columns([4.5, 1])
-            with r1:
-                chk = st.checkbox(
-                    f"**{req['task']}** — *(Phụ trách: {req['assigned']})*",
-                    value=req.get("done", False),
-                    key=f"chk_{i}",
-                )
-                if chk != req.get("done", False):
-                    db["requirements"][i]["done"] = chk
-                    save_cloud(db)
-                    st.rerun()
-            with r2:
-                if st.button("🗑️", key=f"del_req_{i}", use_container_width=True):
-                    db["requirements"].pop(i)
-                    if save_cloud(db):
-                        st.rerun()
-
-    # --- TAB 3: THÀNH VIÊN ---
-    with t_mem:
-        st.subheader(f"Danh sách đã đăng ký ({len(db['users'])} người)")
-        if not db["users"]:
-            st.info("Chưa có thành viên nào đăng ký.")
-        else:
-            for m in db["users"].keys():
-                st.write(f"👤 **{m}**")
