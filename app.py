@@ -123,8 +123,7 @@ is_admin = (me.strip().lower() == "athuy125")
 
 col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
 with col_a:
-    role_tag = " 👑 (Admin)" if is_admin else ""
-    st.success(f"🟢 Xin chào **{me}**{role_tag}!")
+    st.success(f"🟢 Xin chào **{me}**!")
 with col_b:
     if st.button("🔄 Làm mới", use_container_width=True):
         load_cloud.clear()
@@ -140,7 +139,7 @@ if st.session_state.selected_trip is None or st.session_state.selected_trip not 
     st.markdown(LOBBY_HTML, unsafe_allow_html=True)
 
     if is_admin:
-        with st.expander("👑 Tạo Chuyến Đi Mới (Chỉ Admin)", expanded=False):
+        with st.expander("➕ Tạo Chuyến Đi Mới", expanded=False):
             with st.form("create_trip_form", clear_on_submit=True):
                 new_trip_name = st.text_input("Tên chuyến đi mới", placeholder="Ví dụ: Chuyến đi chơi 2 - Vũng Tàu...")
                 new_trip_desc = st.text_input("Mô tả / Thời gian dự kiến", placeholder="Ví dụ: Đi 2 ngày 1 đêm cuối tháng...")
@@ -312,14 +311,14 @@ with t_mem:
 
     if is_admin:
         with st.container(border=True):
-            st.markdown("👑 **Bảng điều khiển Admin:** Chọn thành viên cần xóa khỏi hệ thống")
+            st.markdown("⚙️ **Quản lý danh sách thành viên:**")
             deletable_members = [m for m in all_members if m != me]
             if deletable_members:
                 c_sel, c_btn = st.columns([3.5, 1.5])
                 with c_sel:
                     target_user = st.selectbox("Chọn tên", deletable_members, label_visibility="collapsed")
                 with c_btn:
-                    if st.button("🗑️ Xóa ngay", key="admin_del_btn", use_container_width=True):
+                    if st.button("🗑️ Xóa", key="admin_del_btn", use_container_width=True):
                         load_cloud.clear()
                         current_db = load_cloud()
                         if target_user in current_db["users"]:
@@ -343,6 +342,5 @@ with t_mem:
             assigned_tasks = [req["task"] for req in reqs if req.get("assigned") == member_name]
             task_status = f"🎒 Nhận lo ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ dùng"
 
-            role_badge = " 👑 (Admin)" if member_name.lower() == "athuy125" else ""
-            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}{role_badge}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {task_status}</div></div>'
+            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {task_status}</div></div>'
             st.markdown(card_html, unsafe_allow_html=True)
