@@ -9,7 +9,6 @@ st.set_page_config(
     layout="centered",
 )
 
-# Kho lưu trữ đám mây chung cho toàn đội qua KVDB.io (Miễn phí, ổn định, không chặn Streamlit)
 BUCKET_ID = "9W8xK2mP7vL4qR9tY3nB6z"
 KEY_NAME = "camping_team_2411_data"
 CLOUD_URL = f"https://kvdb.io{BUCKET_ID}/{KEY_NAME}"
@@ -98,15 +97,7 @@ def push_cloud_data(payload: dict) -> bool:
         return False
 
 
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-db = fetch_cloud_data()
-
-# ==========================================
-# GIAO DIỆN 1: ĐĂNG NHẬP & ĐĂNG KÝ
-# ==========================================
-if st.session_state.user is None:
+def show_auth_screen(db: dict):
     st.markdown(
         """
         <div class="hero-box" style="text-align: center;">
@@ -159,10 +150,111 @@ if st.session_state.user is None:
                         st.success("Đăng ký thành công và đã lưu online!")
                         st.rerun()
 
-# ==========================================
-# GIAO DIỆN 2: TRANG CHÍNH SAU KHI VÀO
-# ==========================================
-else:
+
+def show_locations_tab(db: dict, me: str):
+    with st.expander("➕ Đề xuất thêm địa điểm mới", expanded=False):
+        with st.form("add_loc", clear_on_submit=True):
+            loc_title = st.text_input("Tên địa điểm", placeholder="Ví dụ: Hồ Trị An, Núi Chứa Chan...")
+            loc_note = st.text_input("Ghi chú / Khoảng cách", placeholder="Cách trung tâm bao xa, cảnh đẹp...")
+            if st.form_submit_button("Lưu Địa Điểm", use_container_width=True):
+                if loc_title.strip():
+                    db["locations"].append(
+                        {
+                            "name": loc_title.strip(),
+                            "desc": loc_note.strip() or "Chưa có mô tả",
+                            "voters": [me],
+                            "by": me,
+                        }
+                    )
+                    if push_cloud_data(db):
+                        st.rerun()
+                else:
+                    st.warning("Bạn chưa nhập tên địa điểm.")
+
+    if len(db["locations"]) == 0:
+        st.info("Chưa có địa điểm nào. Bấm vào mục 'Đề xuất thêm địa điểm mới' ở trên để tạo nhé!")
+        return
+
+    for i, item in enumerate(db["locations"]):
+        voters = item.get("voters", [])
+        voted = me in voters
+
+        st.markdown(
+            f"""
+            <div class="card-box">
+                <h4 style="margin:0 0 6px 0; color:#34d399;">📍 {item['name']}</h4>
+                <p style="margin:0 0 8px 0; color:#cbd5e1; font-size:14px;">{item.get('desc', '')}</p>
+                <span class="badge">🔥 {len(voters)} phiếu bầu</span>
+                <p style="margin:8px 0 0 0; font-size:13px; color:#94a3b8;">
+                    <b>Đã chọn:</b> {', '.join(voters) if voters else 'Chưa có ai'}
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        b1, b2 = st.columns([4, 1.2])
+        with b1:
+            label = "✅ Đã Vote (Bấm để hủy)" if voted else "👍 Bầu Chọn Địa Điểm Này"
+            if st.button(label, key=f"v_{i}", use_container_width=True):
+                if voted:
+                    voters.remove(me)
+                else:
+                    voters.append(me)
+                item["voters"] = voters
+                if push_cloud_data(db):
+                    st.rerun()
+        with b2:
+            if st.button("🗑️ Xóa", key=f"del_l_{i}", use_container_width=True):
+                db["locations"].pop(i)
+                if push_cloud_data(db):
+                    st.rerun()
+        st.markdown("<br>", unsafe_allow_html=True)
+
+
+def show_requirements_tab(db: dict, me: str):
+    with st.form("add_req", clear_on_submit=True):
+        task_name = st.text_input("Món đồ / Công việc cần chuẩn bị", placeholder="Ví dụ: Lều trại, than nướng, nước suối...")
+        person = st.text_input("Người phụ trách", value=me)
+        if st.form_submit_button("➕ Thêm Vào Danh Sách", use_container_width=True):
+            if task_name.strip():
+                db["requirements"].append(
+                    {
+                        "task": task_name.strip(),
+                        "assigned": person.strip() or "Chưa phân công",
+                        "done": False,
+                    }
+                )
+                if push_cloud_data(db):
+                    st.rerun()
+            else:
+                st.warning("Vui lòng nhập tên món đồ.")
+
+    st.divider()
+    if len(db["requirements"]) == 0:
+        st.info("Danh sách đồ cần chuẩn bị đang trống.")
+        return
+
+    for i, req in enumerate(db["requirements"]):
+        rc1, rc2 = st.columns([4.5, 1])
+        with rc1:
+            checked = st.checkbox(
+                f"**{req['task']}** — *(Phụ trách: {req['assigned']})*",
+                value=req.get("done", False),
+                key=f"chk_{i}",
+            )
+            if checked != req.get("done", False):
+                db["requirements"][i]["done"] = checked
+                push_cloud_data(db)
+                st.rerun()
+        with rc2:
+            if st.button("🗑️", key=f"del_r_{i}", use_container_width=True):
+                db["requirements"].pop(i)
+                if push_cloud_data(db):
+                    st.rerun()
+
+
+def show_main_screen(db: dict):
     me = st.session_state.user
 
     c1, c2 = st.columns([4, 1.5])
@@ -185,86 +277,3 @@ else:
         unsafe_allow_html=True,
     )
 
-    t1, t2, t3 = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên"])
-
-    # --- TAB 1: ĐỊA ĐIỂM ---
-    with t1:
-        with st.expander("➕ Đề xuất thêm địa điểm mới", expanded=False):
-            with st.form("add_loc", clear_on_submit=True):
-                loc_title = st.text_input("Tên địa điểm", placeholder="Ví dụ: Hồ Trị An, Núi Chứa Chan...")
-                loc_note = st.text_input("Ghi chú / Khoảng cách", placeholder="Cách trung tâm bao xa, cảnh đẹp...")
-                if st.form_submit_button("Lưu Địa Điểm", use_container_width=True):
-                    if loc_title.strip():
-                        db["locations"].append(
-                            {
-                                "name": loc_title.strip(),
-                                "desc": loc_note.strip() or "Chưa có mô tả",
-                                "voters": [me],
-                                "by": me,
-                            }
-                        )
-                        if push_cloud_data(db):
-                            st.rerun()
-                    else:
-                        st.warning("Bạn chưa nhập tên địa điểm.")
-
-        if not db["locations"]:
-            st.info("Chưa có địa điểm nào. Bấm vào mục 'Đề xuất thêm địa điểm mới' ở trên để tạo nhé!")
-
-        for i, item in enumerate(db["locations"]):
-            voters = item.get("voters", [])
-            voted = me in voters
-
-            st.markdown(
-                f"""
-                <div class="card-box">
-                    <h4 style="margin:0 0 6px 0; color:#34d399;">📍 {item['name']}</h4>
-                    <p style="margin:0 0 8px 0; color:#cbd5e1; font-size:14px;">{item.get('desc', '')}</p>
-                    <span class="badge">🔥 {len(voters)} phiếu bầu</span>
-                    <p style="margin:8px 0 0 0; font-size:13px; color:#94a3b8;">
-                        <b>Đã chọn:</b> {', '.join(voters) if voters else 'Chưa có ai'}
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-            b1, b2 = st.columns([4, 1.2])
-            with b1:
-                label = "✅ Đã Vote (Bấm để hủy)" if voted else "👍 Bầu Chọn Địa Điểm Này"
-                if st.button(label, key=f"v_{i}", use_container_width=True):
-                    if voted:
-                        voters.remove(me)
-                    else:
-                        voters.append(me)
-                    item["voters"] = voters
-                    if push_cloud_data(db):
-                        st.rerun()
-            with b2:
-                if st.button("🗑️ Xóa", key=f"del_l_{i}", use_container_width=True):
-                    db["locations"].pop(i)
-                    if push_cloud_data(db):
-                        st.rerun()
-            st.markdown("<br>", unsafe_allow_html=True)
-
-    # --- TAB 2: ĐỒ DÙNG ---
-    with t2:
-        with st.form("add_req", clear_on_submit=True):
-            task_name = st.text_input("Món đồ / Công việc cần chuẩn bị", placeholder="Ví dụ: Lều trại, than nướng, nước suối...")
-            person = st.text_input("Người phụ trách", value=me)
-            if st.form_submit_button("➕ Thêm Vào Danh Sách", use_container_width=True):
-                if task_name.strip():
-                    db["requirements"].append(
-                        {
-                            "task": task_name.strip(),
-                            "assigned": person.strip() or "Chưa phân công",
-                            "done": False,
-                        }
-                    )
-                    if push_cloud_data(db):
-                        st.rerun()
-                else:
-                    st.warning("Vui lòng nhập tên món đồ.")
-
-        st.divider()
-        if not db["requirements"]:
