@@ -2,7 +2,7 @@ import hashlib
 import requests
 import streamlit as st
 
-st.set_page_config(page_title="ĐI CHƠIIIII", page_icon="⛺", layout="centered")
+st.set_page_config(page_title="Kế Hoạch Đội - Quản Lý Chuyến Đi", page_icon="⛺", layout="centered")
 
 BIN_ID = "6af5b874ffd5d16053bc0858"
 MASTER_KEY = "$2a$10$EpLPTXlcBTH5/mkxVMBLI.ZSv26QzgFaygkYFHZOa4V7OoVtsot12"
@@ -14,6 +14,7 @@ CSS_STYLE = """
 <style>
 .stApp { background-color: #0b1120; color: #f8fafc; }
 .hero-banner { background: linear-gradient(135deg, #059669 0%, #2563eb 100%); border-radius: 16px; padding: 24px; margin-bottom: 22px; color: #ffffff; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); }
+.trip-card { background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid #3b82f6; border-radius: 14px; padding: 20px; margin-bottom: 12px; }
 .vote-badge { display: inline-block; background-color: #064e3b; color: #34d399; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
 .member-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
 div.stButton > button { border-radius: 10px; font-weight: 600; }
@@ -26,7 +27,7 @@ def make_hash(text: str) -> str:
 
 @st.cache_data(ttl=15, show_spinner=False)
 def load_cloud() -> dict:
-    default = {"users": {}, "locations": [], "requirements": []}
+    default = {"users": {}, "trips": {}}
     try:
         latest_url = "/".join([API_URL, "latest"])
         r = requests.get(latest_url, headers=HEADERS, timeout=10)
@@ -35,8 +36,18 @@ def load_cloud() -> dict:
             record = res_json.get("record", res_json)
             if isinstance(record, dict):
                 default["users"] = record.get("users", {})
-                default["locations"] = record.get("locations", [])
-                default["requirements"] = record.get("requirements", [])
+                trips = record.get("trips", {})
+                if not trips:
+                    old_locs = record.get("locations", [])
+                    old_reqs = record.get("requirements", [])
+                    trips = {
+                        "Chuyến đi chơi 1 (24/11)": {
+                            "desc": "Ngày 24/11 anh em nghỉ nguyên ngày để đi cắm trại kết hợp Vòng 2 sát hạch nhân sự mới.",
+                            "locations": old_locs,
+                            "requirements": old_reqs,
+                        }
+                    }
+                default["trips"] = trips
     except Exception as e:
         st.warning(f"Đang kết nối lại máy chủ: {e}")
     return default
@@ -55,11 +66,13 @@ def save_cloud(data: dict) -> bool:
 
 if "user" not in st.session_state:
     st.session_state.user = None
+if "selected_trip" not in st.session_state:
+    st.session_state.selected_trip = None
 
 db = load_cloud()
 
 if st.session_state.user is None:
-    AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia kế hoạch 24/11</p></div>'
+    AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
     st.markdown(AUTH_HTML, unsafe_allow_html=True)
     tab1, tab2 = st.tabs(["🔑 Đăng Nhập", "📝 Đăng Ký Lần Đầu"])
 
@@ -104,11 +117,14 @@ if st.session_state.user is None:
                             st.rerun()
 
     st.stop()
+
 me = st.session_state.user
+is_admin = (me.strip().lower() == "athuy125")
 
 col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
 with col_a:
-    st.success(f"🟢 Xin chào **{me}**! Đã bật tiết kiệm API.")
+    role_tag = " 👑 (Admin)" if is_admin else ""
+    st.success(f"🟢 Xin chào **{me}**{role_tag}!")
 with col_b:
     if st.button("🔄 Làm mới", use_container_width=True):
         load_cloud.clear()
@@ -116,9 +132,77 @@ with col_b:
 with col_c:
     if st.button("Thoát", use_container_width=True):
         st.session_state.user = None
+        st.session_state.selected_trip = None
         st.rerun()
 
-MAIN_HTML = '<div class="hero-banner"><h2 style="margin:0;">⛺ DÃ NGOẠI & SÁT HẠCH TOÀN ĐỘI (24/11)</h2><p style="margin:8px 0 0 0; font-size:15px;">Ngày <b>24/11</b> anh em nghỉ nguyên ngày để đi cắm trại kết hợp Vòng 2 sát hạch nhân sự mới.</p></div>'
+if st.session_state.selected_trip is None or st.session_state.selected_trip not in db["trips"]:
+    LOBBY_HTML = '<div class="hero-banner"><h2 style="margin:0;">🗺️ DANH SÁCH CHUYẾN ĐI CỦA ĐỘI</h2><p style="margin:8px 0 0 0; font-size:15px;">Chọn một chuyến đi bên dưới để bình chọn địa điểm và phân công đồ dùng.</p></div>'
+    st.markdown(LOBBY_HTML, unsafe_allow_html=True)
+
+    if is_admin:
+        with st.expander("👑 Tạo Chuyến Đi Mới (Chỉ Admin)", expanded=False):
+            with st.form("create_trip_form", clear_on_submit=True):
+                new_trip_name = st.text_input("Tên chuyến đi mới", placeholder="Ví dụ: Chuyến đi chơi 2 - Vũng Tàu...")
+                new_trip_desc = st.text_input("Mô tả / Thời gian dự kiến", placeholder="Ví dụ: Đi 2 ngày 1 đêm cuối tháng...")
+                if st.form_submit_button("➕ Tạo Chuyến Đi", use_container_width=True):
+                    t_clean = new_trip_name.strip()
+                    if not t_clean:
+                        st.warning("Vui lòng nhập tên chuyến đi!")
+                    else:
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        if t_clean in current_db["trips"]:
+                            st.error("Tên chuyến đi này đã tồn tại!")
+                        else:
+                            current_db["trips"][t_clean] = {
+                                "desc": new_trip_desc.strip() or "Kế hoạch dã ngoại mới của toàn đội.",
+                                "locations": [],
+                                "requirements": [],
+                            }
+                            if save_cloud(current_db):
+                                st.success(f"Đã tạo '{t_clean}'!")
+                                st.rerun()
+
+    trip_names = list(db["trips"].keys())
+    if len(trip_names) == 0:
+        st.info("Chưa có chuyến đi nào được tạo.")
+    else:
+        for idx, t_name in enumerate(trip_names):
+            t_info = db["trips"][t_name]
+            n_locs = len(t_info.get("locations", []))
+            n_reqs = len(t_info.get("requirements", []))
+            card_t = f'<div class="trip-card"><h3 style="margin:0 0 6px 0; color:#38bdf8;">⛺ {t_name}</h3><p style="margin:0 0 10px 0; color:#cbd5e1; font-size:14px;">{t_info.get("desc", "")}</p><span class="vote-badge">📍 {n_locs} địa điểm &nbsp;|&nbsp; 🎒 {n_reqs} món đồ</span></div>'
+            st.markdown(card_t, unsafe_allow_html=True)
+
+            if is_admin and len(trip_names) > 1:
+                b_enter, b_del = st.columns([4, 1.2])
+                with b_enter:
+                    if st.button(f"🚀 Vào {t_name}", key=f"enter_trip_{idx}", use_container_width=True):
+                        st.session_state.selected_trip = t_name
+                        st.rerun()
+                with b_del:
+                    if st.button("🗑️ Xóa", key=f"del_trip_{idx}", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        if t_name in current_db["trips"]:
+                            del current_db["trips"][t_name]
+                            if save_cloud(current_db):
+                                st.rerun()
+            else:
+                if st.button(f"🚀 Vào {t_name}", key=f"enter_trip_{idx}", use_container_width=True):
+                    st.session_state.selected_trip = t_name
+                    st.rerun()
+            st.markdown("<br>", unsafe_allow_html=True)
+
+    st.stop()
+cur_trip = st.session_state.selected_trip
+trip_data = db["trips"][cur_trip]
+
+if st.button("⬅️ Quay lại danh sách chuyến đi", use_container_width=True):
+    st.session_state.selected_trip = None
+    st.rerun()
+
+MAIN_HTML = f'<div class="hero-banner"><h2 style="margin:0;">⛺ {cur_trip.upper()}</h2><p style="margin:8px 0 0 0; font-size:15px;">{trip_data.get("desc", "")}</p></div>'
 st.markdown(MAIN_HTML, unsafe_allow_html=True)
 
 t_loc, t_req, t_mem = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên"])
@@ -133,16 +217,17 @@ with t_loc:
                     load_cloud.clear()
                     current_db = load_cloud()
                     new_loc = {"name": l_name.strip(), "desc": l_desc.strip() or "Chưa có mô tả", "voters": [me]}
-                    current_db["locations"].append(new_loc)
+                    current_db["trips"][cur_trip]["locations"].append(new_loc)
                     if save_cloud(current_db):
                         st.rerun()
                 else:
                     st.warning("Vui lòng nhập tên địa điểm!")
 
-    if len(db["locations"]) == 0:
-        st.info("Chưa có địa điểm nào được đề xuất.")
+    locs = trip_data.get("locations", [])
+    if len(locs) == 0:
+        st.info("Chưa có địa điểm nào được đề xuất cho chuyến đi này.")
 
-    for i, loc in enumerate(db["locations"]):
+    for i, loc in enumerate(locs):
         voters = loc.get("voters", [])
         voted = me in voters
 
@@ -158,21 +243,23 @@ with t_loc:
                 if st.button(btn_text, key=f"vote_{i}", use_container_width=True):
                     load_cloud.clear()
                     current_db = load_cloud()
-                    if i < len(current_db["locations"]):
-                        cur_voters = current_db["locations"][i].get("voters", [])
+                    t_locs = current_db["trips"][cur_trip]["locations"]
+                    if i < len(t_locs):
+                        cur_voters = t_locs[i].get("voters", [])
                         if me in cur_voters:
                             cur_voters.remove(me)
                         else:
                             cur_voters.append(me)
-                        current_db["locations"][i]["voters"] = cur_voters
+                        t_locs[i]["voters"] = cur_voters
                         if save_cloud(current_db):
                             st.rerun()
             with c2:
                 if st.button("🗑️", key=f"del_loc_{i}", use_container_width=True):
                     load_cloud.clear()
                     current_db = load_cloud()
-                    if i < len(current_db["locations"]):
-                        current_db["locations"].pop(i)
+                    t_locs = current_db["trips"][cur_trip]["locations"]
+                    if i < len(t_locs):
+                        t_locs.pop(i)
                         if save_cloud(current_db):
                             st.rerun()
 
@@ -185,17 +272,18 @@ with t_req:
                 load_cloud.clear()
                 current_db = load_cloud()
                 new_req = {"task": t_name.strip(), "assigned": t_who.strip() or "Chưa phân công", "done": False}
-                current_db["requirements"].append(new_req)
+                current_db["trips"][cur_trip]["requirements"].append(new_req)
                 if save_cloud(current_db):
                     st.rerun()
             else:
                 st.warning("Vui lòng nhập tên đồ dùng!")
 
     st.divider()
-    if len(db["requirements"]) == 0:
-        st.info("Chưa có đồ dùng nào trong danh sách.")
+    reqs = trip_data.get("requirements", [])
+    if len(reqs) == 0:
+        st.info("Chưa có đồ dùng nào trong danh sách của chuyến đi này.")
 
-    for i, req in enumerate(db["requirements"]):
+    for i, req in enumerate(reqs):
         r1, r2 = st.columns([4.5, 1])
         with r1:
             label_text = f"**{req['task']}** — *(Phụ trách: {req['assigned']})*"
@@ -203,54 +291,58 @@ with t_req:
             if chk != req.get("done", False):
                 load_cloud.clear()
                 current_db = load_cloud()
-                if i < len(current_db["requirements"]):
-                    current_db["requirements"][i]["done"] = chk
+                t_reqs = current_db["trips"][cur_trip]["requirements"]
+                if i < len(t_reqs):
+                    t_reqs[i]["done"] = chk
                     if save_cloud(current_db):
                         st.rerun()
         with r2:
             if st.button("🗑️", key=f"del_req_{i}", use_container_width=True):
                 load_cloud.clear()
                 current_db = load_cloud()
-                if i < len(current_db["requirements"]):
-                    current_db["requirements"].pop(i)
+                t_reqs = current_db["trips"][cur_trip]["requirements"]
+                if i < len(t_reqs):
+                    t_reqs.pop(i)
                     if save_cloud(current_db):
                         st.rerun()
 
 with t_mem:
     all_members = list(db["users"].keys())
-    st.subheader(f"👥 Danh sách thành viên đã tham gia ({len(all_members)} người)")
+    st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
 
-    if me == "athuy125":
-        st.info("👑 Bạn đang đăng nhập với quyền Quản trị viên (Admin). Bạn có thể xóa thành viên bên dưới.")
+    if is_admin:
+        with st.container(border=True):
+            st.markdown("👑 **Bảng điều khiển Admin:** Chọn thành viên cần xóa khỏi hệ thống")
+            deletable_members = [m for m in all_members if m != me]
+            if deletable_members:
+                c_sel, c_btn = st.columns([3.5, 1.5])
+                with c_sel:
+                    target_user = st.selectbox("Chọn tên", deletable_members, label_visibility="collapsed")
+                with c_btn:
+                    if st.button("🗑️ Xóa ngay", key="admin_del_btn", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        if target_user in current_db["users"]:
+                            del current_db["users"][target_user]
+                        for tr in current_db["trips"].values():
+                            for loc in tr.get("locations", []):
+                                if target_user in loc.get("voters", []):
+                                    loc["voters"].remove(target_user)
+                        if save_cloud(current_db):
+                            st.success(f"Đã xóa {target_user}!")
+                            st.rerun()
+            else:
+                st.caption("Không có thành viên nào khác để xóa.")
 
     if len(all_members) == 0:
         st.info("Chưa có thành viên nào đăng ký.")
     else:
         for idx, member_name in enumerate(all_members, start=1):
-            voted_places = [loc["name"] for loc in db["locations"] if member_name in loc.get("voters", [])]
+            voted_places = [loc["name"] for loc in locs if member_name in loc.get("voters", [])]
             vote_status = f"✅ Đã vote: {', '.join(voted_places)}" if voted_places else "⏳ Chưa bình chọn địa điểm"
-            assigned_tasks = [req["task"] for req in db["requirements"] if req.get("assigned") == member_name]
+            assigned_tasks = [req["task"] for req in reqs if req.get("assigned") == member_name]
             task_status = f"🎒 Nhận lo ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ dùng"
 
-            role_badge = " 👑 *(Admin)*" if member_name == "athuy125" else ""
+            role_badge = " 👑 (Admin)" if member_name.lower() == "athuy125" else ""
             card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}{role_badge}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {task_status}</div></div>'
-
-            # Chỉ tài khoản athuy125 mới thấy cột nút xóa (và không hiện nút xóa cho chính mình)
-            if me == "athuy125" and member_name != "athuy125":
-                col_m1, col_m2 = st.columns([5, 1])
-                with col_m1:
-                    st.markdown(card_html, unsafe_allow_html=True)
-                with col_m2:
-                    if st.button("🗑️", key=f"del_user_{idx}", use_container_width=True):
-                        load_cloud.clear()
-                        current_db = load_cloud()
-                        if member_name in current_db["users"]:
-                            del current_db["users"][member_name]
-                        for loc in current_db["locations"]:
-                            if member_name in loc.get("voters", []):
-                                loc["voters"].remove(member_name)
-                        if save_cloud(current_db):
-                            st.rerun()
-            else:
-                st.markdown(card_html, unsafe_allow_html=True)
-
+            st.markdown(card_html, unsafe_allow_html=True)
