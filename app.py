@@ -1,5 +1,4 @@
 import hashlib
-import json
 import requests
 import streamlit as st
 
@@ -9,12 +8,14 @@ st.set_page_config(
     layout="centered",
 )
 
-# Kho lưu trữ chính trên npoint.io của bạn
-API_URL = "https://npoint.io"
+# Thông số kết nối JSONBin.io của bạn
+BIN_ID = "6af5b874ffd5d16053bc0858"
+MASTER_KEY = "$2a$10$EpLPTXlcBTH5/mkxVMBLI.ZSv26QzgFaygkYFHZOa4V7OoVtsot12"
+
+API_URL = f"https://jsonbin.io{BIN_ID}"
 HEADERS = {
     "Content-Type": "application/json",
-    "Accept": "application/json",
-    "User-Agent": "Mozilla/5.0",
+    "X-Master-Key": MASTER_KEY,
 }
 
 st.markdown(
@@ -59,13 +60,14 @@ def make_hash(text: str) -> str:
 def load_cloud() -> dict:
     default = {"users": {}, "locations": [], "requirements": []}
     try:
-        r = requests.get(API_URL, headers=HEADERS, timeout=10)
+        r = requests.get(f"{API_URL}/latest", headers=HEADERS, timeout=10)
         if r.status_code == 200:
-            data = r.json()
-            if isinstance(data, dict):
-                default["users"] = data.get("users", {})
-                default["locations"] = data.get("locations", [])
-                default["requirements"] = data.get("requirements", [])
+            res_json = r.json()
+            record = res_json.get("record", res_json)
+            if isinstance(record, dict):
+                default["users"] = record.get("users", {})
+                default["locations"] = record.get("locations", [])
+                default["requirements"] = record.get("requirements", [])
     except Exception as e:
         st.warning(f"Đang kết nối lại máy chủ: {e}")
     return default
@@ -73,18 +75,10 @@ def load_cloud() -> dict:
 
 def save_cloud(data: dict) -> bool:
     try:
-        payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
-        # npoint.io yêu cầu PUT kèm Content-Type: application/json để cập nhật Bin
-        r = requests.put(API_URL, data=payload, headers=HEADERS, timeout=10)
+        r = requests.put(API_URL, json=data, headers=HEADERS, timeout=10)
         if r.status_code == 200:
             return True
-
-        # Thử lại bằng POST nếu PUT không được phép
-        r_post = requests.post(API_URL, data=payload, headers=HEADERS, timeout=10)
-        if r_post.status_code == 200:
-            return True
-
-        st.error(f"Máy chủ npoint.io báo lỗi (Mã {r.status_code}). Hãy thử tạo Bin mới trên npoint.io và dán ID vào code!")
+        st.error(f"Lỗi lưu dữ liệu (Mã {r.status_code}): {r.text}")
         return False
     except Exception as e:
         st.error(f"Lỗi mạng: {e}")
@@ -266,4 +260,8 @@ else:
     # --- TAB 3: THÀNH VIÊN ---
     with t_mem:
         st.subheader(f"Danh sách đã đăng ký ({len(db['users'])} người)")
-        for m in db["users"].keys():
+        if not db["users"]:
+            st.info("Chưa có thành viên nào đăng ký.")
+        else:
+            for m in db["users"].keys():
+                st.write(f"👤 **{m}**")
