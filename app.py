@@ -12,7 +12,8 @@ st.set_page_config(
 BIN_ID = "6af5b874ffd5d16053bc0858"
 MASTER_KEY = "$2a$10$EpLPTXlcBTH5/mkxVMBLI.ZSv26QzgFaygkYFHZOa4V7OoVtsot12"
 
-API_URL = f"https://jsonbin.io{BIN_ID}"
+# Dùng join để đảm bảo tuyệt đối không bao giờ bị mất dấu '/'
+API_URL = "/".join(["https:/", "api.jsonbin.io", "v3", "b", BIN_ID])
 HEADERS = {
     "Content-Type": "application/json",
     "X-Master-Key": MASTER_KEY,
@@ -60,7 +61,8 @@ def make_hash(text: str) -> str:
 def load_cloud() -> dict:
     default = {"users": {}, "locations": [], "requirements": []}
     try:
-        r = requests.get(f"{API_URL}/latest", headers=HEADERS, timeout=10)
+        latest_url = "/".join([API_URL, "latest"])
+        r = requests.get(latest_url, headers=HEADERS, timeout=10)
         if r.status_code == 200:
             res_json = r.json()
             record = res_json.get("record", res_json)
