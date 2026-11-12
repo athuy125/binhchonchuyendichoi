@@ -3,7 +3,7 @@ import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="ĐI CHƠIIIII",
+    page_title="ĐI CHƠIIII",
     page_icon="⛺",
     layout="centered",
 )
@@ -80,7 +80,6 @@ def save_cloud(data: dict) -> bool:
     try:
         r = requests.put(API_URL, json=data, headers=HEADERS, timeout=10)
         if r.status_code == 200:
-            # Xóa bộ nhớ đệm ngay khi có dữ liệu mới để đồng bộ tức thì
             load_cloud.clear()
             return True
         st.error(f"Lỗi lưu dữ liệu (Mã {r.status_code}): {r.text}")
@@ -121,7 +120,6 @@ if st.session_state.user is None:
                 if not name or not pwd:
                     st.warning("Vui lòng nhập đủ tên và mật khẩu!")
                 else:
-                    # Tải dữ liệu mới nhất trước khi kiểm tra đăng nhập
                     load_cloud.clear()
                     fresh_db = load_cloud()
                     if name not in fresh_db["users"]:
@@ -196,11 +194,8 @@ else:
                     if l_name.strip():
                         load_cloud.clear()
                         current_db = load_cloud()
-                        current_db["locations"].append({
-                            "name": l_name.strip(),
-                            "desc": l_desc.strip() or "Chưa có mô tả",
-                            "voters": [me],
-                        })
+                        new_loc = {"name": l_name.strip(), "desc": l_desc.strip() or "Chưa có mô tả", "voters": [me]}
+                        current_db["locations"].append(new_loc)
                         if save_cloud(current_db):
                             st.rerun()
                     else:
@@ -252,5 +247,12 @@ else:
                 if t_name.strip():
                     load_cloud.clear()
                     current_db = load_cloud()
-                    current_db["requirements"].append( {
-                        "task": t_name.strip(),
+                    new_req = {"task": t_name.strip(), "assigned": t_who.strip() or "Chưa phân công", "done": False}
+                    current_db["requirements"].append(new_req)
+                    if save_cloud(current_db):
+                        st.rerun()
+                else:
+                    st.warning("Vui lòng nhập tên đồ dùng!")
+
+        st.divider()
+        if not db["requirements"]:
