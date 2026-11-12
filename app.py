@@ -8,8 +8,15 @@ st.set_page_config(
     layout="centered",
 )
 
-BIN_ID = "827d1b013f00d93657e9"
-API_URL = f"https://npoint.io{BIN_ID}"
+# Sử dụng JSONBlob làm máy chủ lưu trữ đám mây ổn định cho Streamlit
+BLOB_ID = "1306249854114570240"
+API_URL = f"https://jsonblob.com{BLOB_ID}"
+
+HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+}
 
 st.markdown(
     """
@@ -61,7 +68,7 @@ def make_hash(text):
 def fetch_cloud_data():
     default_data = {"users": {}, "locations": [], "requirements": []}
     try:
-        res = requests.get(API_URL, timeout=8)
+        res = requests.get(API_URL, headers=HEADERS, timeout=10)
         if res.status_code == 200:
             raw = res.json()
             if isinstance(raw, dict):
@@ -75,12 +82,13 @@ def fetch_cloud_data():
 
 def push_cloud_data(payload):
     try:
-        res = requests.post(API_URL, json=payload, timeout=8)
-        if res.status_code == 200:
+        res = requests.put(API_URL, json=payload, headers=HEADERS, timeout=10)
+        if res.status_code in:
             return True
-        res_put = requests.put(API_URL, json=payload, timeout=8)
-        return res_put.status_code == 200
-    except Exception:
+        st.error(f"Lỗi máy chủ (Mã {res.status_code}): {res.text}")
+        return False
+    except Exception as e:
+        st.error(f"Lỗi kết nối mạng: {e}")
         return False
 
 
@@ -144,8 +152,6 @@ if st.session_state.user is None:
                         st.session_state.user = new_name
                         st.success("Đăng ký thành công!")
                         st.rerun()
-                    else:
-                        st.error("Không kết nối được máy chủ lưu trữ. Vui lòng bấm lại!")
 
 # ==========================================
 # GIAO DIỆN 2: TRANG CHÍNH SAU KHI VÀO
@@ -263,8 +269,3 @@ else:
             with rc1:
                 checked = st.checkbox(
                     f"**{req['task']}** — *(Phụ trách: {req['assigned']})*",
-                    value=req.get("done", False),
-                    key=f"chk_{i}",
-                )
-                if checked != req.get("done", False):
-                    db["requirements"][i]["done"] = checked
