@@ -3,52 +3,50 @@ import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="Sát Hạch & Cắm Trại 24/11 - Đội",
+    page_title="Dã Ngoại & Sát Hạch 24/11",
     page_icon="⛺",
-    layout="wide",
+    layout="centered",
 )
 
 BIN_ID = "827d1b013f00d93657e9"
+API_URL = f"https://npoint.io{BIN_ID}"
 
 st.markdown(
     """
     <style>
-    .main {
-        background-color: #0b0f19;
-        color: #f3f4f6;
+    .stApp {
+        background-color: #0f172a;
+        color: #f8fafc;
     }
-    .stButton>button {
-        width: 100%;
+    .card-box {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 14px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+    }
+    .hero-box {
+        background: linear-gradient(135deg, #059669 0%, #2563eb 100%);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        color: white;
+    }
+    .badge {
+        display: inline-block;
+        background-color: #0f172a;
+        color: #38bdf8;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 600;
+        margin-top: 6px;
+    }
+    div.stButton > button {
         border-radius: 10px;
         font-weight: 600;
-        transition: all 0.3s ease;
-        border: 1px solid #374151;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
-        border-color: #10b981;
-    }
-    .auth-box {
-        background: linear-gradient(145deg, #161e2e, #1f2937);
-        padding: 35px;
-        border-radius: 16px;
-        border: 1px solid #374151;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-    }
-    .item-card {
-        background: #161e2e;
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 16px;
-        border: 1px solid #2d3748;
-    }
-    .header-banner {
-        background: linear-gradient(90deg, #065f46 0%, #1e3a8a 100%);
-        padding: 25px;
-        border-radius: 14px;
-        margin-bottom: 20px;
-        border: 1px solid #3b82f6;
+        border: 1px solid #475569;
     }
     </style>
     """,
@@ -56,213 +54,217 @@ st.markdown(
 )
 
 
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+def make_hash(text):
+    return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
 
-def load_data():
+def fetch_cloud_data():
+    default_data = {"users": {}, "locations": [], "requirements": []}
     try:
-        url = f"https://npoint.io{BIN_ID}"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            res_data = response.json()
-            if isinstance(res_data, dict):
-                return {
-                    "users": res_data.get("users", {}),
-                    "locations": res_data.get("locations", []),
-                    "requirements": res_data.get("requirements", []),
-                }
-        else:
-            st.warning(f"Cảnh báo tải dữ liệu (Mã {response.status_code}): {response.text}")
-    except Exception as e:
-        st.error(f"Lỗi kết nối Cloud: {e}")
-    return {"users": {}, "locations": [], "requirements": []}
+        res = requests.get(API_URL, timeout=8)
+        if res.status_code == 200:
+            raw = res.json()
+            if isinstance(raw, dict):
+                default_data["users"] = raw.get("users", {})
+                default_data["locations"] = raw.get("locations", [])
+                default_data["requirements"] = raw.get("requirements", [])
+    except Exception:
+        pass
+    return default_data
 
 
-def save_data(data):
-    url = f"https://npoint.io{BIN_ID}"
-    headers = {"Content-Type": "application/json"}
+def push_cloud_data(payload):
     try:
-        response = requests.post(url, json=data, headers=headers, timeout=10)
-        if response.status_code == 200:
+        res = requests.post(API_URL, json=payload, timeout=8)
+        if res.status_code == 200:
             return True
-
-        response_put = requests.put(url, json=data, headers=headers, timeout=10)
-        if response_put.status_code == 200:
-            return True
-
-        st.error(f"Server từ chối lưu (Mã {response.status_code}): {response.text}")
-        return False
-    except Exception as e:
-        st.error(f"Lỗi mạng khi lưu lên Cloud: {e}")
+        res_put = requests.put(API_URL, json=payload, timeout=8)
+        return res_put.status_code == 200
+    except Exception:
         return False
 
 
-def render_auth_page(data):
-    st.markdown("<br>", unsafe_allow_html=True)
-    _, col_center, _ = st.columns([1, 1.4, 1])
+if "user" not in st.session_state:
+    st.session_state.user = None
 
-    with col_center:
-        st.markdown(
-            """
-            <div class="auth-box">
-                <h2 style="text-align: center; color: #10b981; margin-bottom: 5px;">⛺ CỔNG THÔNG TIN ĐỘI</h2>
-                <p style="text-align: center; color: #9ca3af; font-size: 14px;">
-                    Vui lòng đăng ký hoặc đăng nhập để tham gia kế hoạch Dã Ngoại & Sát Hạch 24/11
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
+db = fetch_cloud_data()
 
-        tab_login, tab_register = st.tabs(["🔑 Đăng Nhập", "📝 Đăng Ký Tài Khoản Mới"])
+# ==========================================
+# GIAO DIỆN 1: ĐĂNG NHẬP & ĐĂNG KÝ
+# ==========================================
+if st.session_state.user is None:
+    st.markdown(
+        """
+        <div class="hero-box" style="text-align: center;">
+            <h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2>
+            <p style="margin:8px 0 0 0; opacity: 0.9;">
+                Đăng nhập hoặc tạo tài khoản mới để tham gia kế hoạch 24/11
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-        with tab_login:
-            with st.form("login_form"):
-                login_name = st.text_input("Tên thành viên", placeholder="Nhập tên bạn đã đăng ký...").strip()
-                login_pass = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
-                btn_login = st.form_submit_button("🚀 Vào Hệ Thống")
+    tab_in, tab_up = st.tabs(["🔑 Đăng Nhập", "📝 Đăng Ký Lần Đầu"])
 
-                if btn_login:
-                    if not login_name or not login_pass:
-                        st.warning("Vui lòng nhập đầy đủ tên và mật khẩu!")
-                    elif login_name not in data["users"]:
-                        st.error("Tên này chưa được đăng ký! Vui lòng chuyển sang tab 'Đăng Ký Tài Khoản Mới'.")
-                    elif data["users"][login_name] == hash_password(login_pass):
-                        st.session_state.logged_in = True
-                        st.session_state.current_user = login_name
-                        st.success(f"Chào mừng {login_name} quay trở lại!")
+    with tab_in:
+        with st.form("form_login"):
+            u_name = st.text_input("Tên của bạn", placeholder="Nhập tên đã đăng ký...").strip()
+            u_pass = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
+            submit_in = st.form_submit_button("🚀 Vào Ứng Dụng", use_container_width=True)
+
+            if submit_in:
+                if not u_name or not u_pass:
+                    st.warning("Vui lòng nhập đầy đủ tên và mật khẩu.")
+                elif u_name not in db["users"]:
+                    st.error("Tài khoản chưa tồn tại. Hãy qua tab Đăng Ký Lần Đầu nhé!")
+                elif db["users"][u_name] != make_hash(u_pass):
+                    st.error("Sai mật khẩu rồi!")
+                else:
+                    st.session_state.user = u_name
+                    st.rerun()
+
+    with tab_up:
+        with st.form("form_register"):
+            new_name = st.text_input("Tên hiển thị của bạn", placeholder="Ví dụ: Huy Đỗ...").strip()
+            new_pass = st.text_input("Tạo mật khẩu", type="password", placeholder="Nhập mật khẩu...")
+            re_pass = st.text_input("Nhập lại mật khẩu", type="password", placeholder="Xác nhận mật khẩu...")
+            submit_up = st.form_submit_button("✅ Đăng Ký & Lưu Online", use_container_width=True)
+
+            if submit_up:
+                if not new_name or not new_pass:
+                    st.warning("Không được để trống tên hoặc mật khẩu.")
+                elif new_pass != re_pass:
+                    st.error("Hai mật khẩu chưa khớp nhau.")
+                elif new_name in db["users"]:
+                    st.error("Tên này đã có người dùng. Bạn hãy thêm tên đệm hoặc đăng nhập nhé!")
+                else:
+                    db["users"][new_name] = make_hash(new_pass)
+                    if push_cloud_data(db):
+                        st.session_state.user = new_name
+                        st.success("Đăng ký thành công!")
                         st.rerun()
                     else:
-                        st.error("Mật khẩu không chính xác!")
+                        st.error("Không kết nối được máy chủ lưu trữ. Vui lòng bấm lại!")
 
-        with tab_register:
-            with st.form("register_form"):
-                reg_name = st.text_input("Tên của bạn (Dùng để hiển thị khi vote & nhận việc)", placeholder="Ví dụ: Nguyễn Văn A...").strip()
-                reg_pass = st.text_input("Tạo mật khẩu", type="password", placeholder="Nhập mật khẩu...")
-                reg_pass_confirm = st.text_input("Nhập lại mật khẩu", type="password", placeholder="Xác nhận lại mật khẩu...")
-                btn_reg = st.form_submit_button("✅ Đăng Ký & Lưu Lên Cloud")
+# ==========================================
+# GIAO DIỆN 2: TRANG CHÍNH SAU KHI VÀO
+# ==========================================
+else:
+    me = st.session_state.user
 
-                if btn_reg:
-                    if not reg_name or not reg_pass:
-                        st.warning("Vui lòng nhập tên và mật khẩu!")
-                    elif reg_pass != reg_pass_confirm:
-                        st.error("Mật khẩu xác nhận không khớp!")
-                    elif reg_name in data["users"]:
-                        st.error("Tên này đã có người đăng ký! Vui lòng chọn tên khác hoặc đăng nhập.")
-                    else:
-                        data["users"][reg_name] = hash_password(reg_pass)
-                        if save_data(data):
-                            st.session_state.logged_in = True
-                            st.session_state.current_user = reg_name
-                            st.success("Đăng ký thành công và đã lưu lên Cloud!")
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        st.markdown(f"🟢 Xin chào, **{me}**!")
+    with c2:
+        if st.button("Đăng xuất", use_container_width=True):
+            st.session_state.user = None
+            st.rerun()
+
+    st.markdown(
+        """
+        <div class="hero-box">
+            <h2 style="margin:0;">⛺ DÃ NGOẠI & SÁT HẠCH ĐỘI (24/11)</h2>
+            <p style="margin:8px 0 0 0; font-size:15px;">
+                Ngày <b>24/11</b> anh em nghỉ trọn vẹn nguyên ngày để đi cắm trại kết hợp Vòng 2 sát hạch nhân sự mới.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    t1, t2, t3 = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên"])
+
+    # --- TAB 1: ĐỊA ĐIỂM ---
+    with t1:
+        with st.expander("➕ Đề xuất thêm địa điểm mới", expanded=False):
+            with st.form("add_loc", clear_on_submit=True):
+                loc_title = st.text_input("Tên địa điểm", placeholder="Ví dụ: Hồ Trị An, Núi Chứa Chan...")
+                loc_note = st.text_input("Ghi chú / Khoảng cách", placeholder="Cách trung tâm bao xa, cảnh đẹp...")
+                if st.form_submit_button("Lưu Địa Điểm", use_container_width=True):
+                    if loc_title.strip():
+                        db["locations"].append(
+                            {
+                                "name": loc_title.strip(),
+                                "desc": loc_note.strip() or "Chưa có mô tả",
+                                "voters": [me],
+                                "by": me,
+                            }
+                        )
+                        if push_cloud_data(db):
                             st.rerun()
+                    else:
+                        st.warning("Bạn chưa nhập tên địa điểm.")
 
+        if not db["locations"]:
+            st.info("Chưa có địa điểm nào. Bấm vào mục 'Đề xuất thêm địa điểm mới' ở trên để tạo nhé!")
 
-def render_locations_tab(data, user):
-    st.subheader("📍 Đề Xuất & Bình Chọn Địa Điểm Cắm Trại")
+        for i, item in enumerate(db["locations"]):
+            voters = item.get("voters", [])
+            voted = me in voters
 
-    with st.form("form_add_location_unique", clear_on_submit=True):
-        col_f1, col_f2 = st.columns([2, 3])
-        with col_f1:
-            new_loc_name = st.text_input("Tên địa điểm mới", placeholder="Ví dụ: Núi Chứa Chan...")
-        with col_f2:
-            new_loc_desc = st.text_input("Mô tả / Khoảng cách", placeholder="Đường đi thuận lợi, cảnh đẹp...")
-        submitted_loc = st.form_submit_button("➕ Thêm Địa Điểm Mới")
+            st.markdown(
+                f"""
+                <div class="card-box">
+                    <h4 style="margin:0 0 6px 0; color:#34d399;">📍 {item['name']}</h4>
+                    <p style="margin:0 0 8px 0; color:#cbd5e1; font-size:14px;">{item.get('desc', '')}</p>
+                    <span class="badge">🔥 {len(voters)} phiếu bầu</span>
+                    <p style="margin:8px 0 0 0; font-size:13px; color:#94a3b8;">
+                        <b>Đã chọn:</b> {', '.join(voters) if voters else 'Chưa có ai'}
+                    </p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-        if submitted_loc:
-            if new_loc_name:
-                new_id = str(len(data["locations"]) + 1)
-                data["locations"].append(
-                    {
-                        "id": new_id,
-                        "name": new_loc_name,
-                        "desc": new_loc_desc or "Chưa có mô tả",
-                        "votes": 0,
-                        "voters": [],
-                        "created_by": user,
-                    }
-                )
-                if save_data(data):
-                    st.success(f"Đã thêm địa điểm '{new_loc_name}' lên hệ thống!")
-                    st.rerun()
-            else:
-                st.warning("Vui lòng nhập tên địa điểm!")
+            b1, b2 = st.columns([3, 1])
+            with b1:
+                label = "✅ Đã Vote (Bấm để hủy)" if voted else "👍 Bầu Chọn Địa Điểm Này"
+                if st.button(label, key=f"v_{i}", use_container_width=True):
+                    if voted:
+                        voters.remove(me)
+                    else:
+                        voters.append(me)
+                    item["voters"] = voters
+                    if push_cloud_data(db):
+                        st.rerun()
+            with b2:
+                if st.button("🗑️ Xóa", key=f"del_l_{i}", use_container_width=True):
+                    db["locations"].pop(i)
+                    if push_cloud_data(db):
+                        st.rerun()
+            st.markdown("<br>", unsafe_allow_html=True)
 
-    st.markdown("### Danh sách các địa điểm hiện tại:")
-    if not data["locations"]:
-        st.info("Chưa có địa điểm nào được thêm. Hãy thêm địa điểm đầu tiên ở trên!")
-        return
-
-    for idx, loc in enumerate(data["locations"]):
-        loc_id = loc.get("id", str(idx))
-        voters_list = loc.get("voters", [])
-        has_voted = user in voters_list
-
-        st.markdown('<div class="item-card">', unsafe_allow_html=True)
-        col1, col2, col3, col4 = st.columns([3, 3.5, 1.5, 2])
-
-        with col1:
-            st.markdown(f"#### 🔥 {loc['name']}")
-            if "created_by" in loc:
-                st.caption(f"Đề xuất bởi: {loc['created_by']}")
-
-        with col2:
-            st.write(loc["desc"])
-            if voters_list:
-                st.caption(f"👤 Đã vote ({len(voters_list)}): {', '.join(voters_list)}")
-
-        with col3:
-            st.metric("Số phiếu", loc["votes"])
-
-        with col4:
-            btn_label = "✅ Đã vote (Hủy)" if has_voted else "👍 Bầu chọn"
-            if st.button(btn_label, key=f"vote_toggle_{loc_id}_{idx}"):
-                if has_voted:
-                    loc["voters"].remove(user)
+    # --- TAB 2: ĐỒ DÙNG ---
+    with t2:
+        with st.form("add_req", clear_on_submit=True):
+            task_name = st.text_input("Món đồ / Công việc cần chuẩn bị", placeholder="Ví dụ: Lều trại, than nướng, nước suối...")
+            person = st.text_input("Người phụ trách", value=me)
+            if st.form_submit_button("➕ Thêm Vào Danh Sách", use_container_width=True):
+                if task_name.strip():
+                    db["requirements"].append(
+                        {
+                            "task": task_name.strip(),
+                            "assigned": person.strip() or "Chưa phân công",
+                            "done": False,
+                        }
+                    )
+                    if push_cloud_data(db):
+                        st.rerun()
                 else:
-                    loc["voters"].append(user)
-                loc["votes"] = len(loc["voters"])
-                if save_data(data):
-                    st.rerun()
+                    st.warning("Vui lòng nhập tên món đồ.")
 
-            if st.button("🗑️ Xóa", key=f"del_loc_btn_{loc_id}_{idx}"):
-                data["locations"].pop(idx)
-                if save_data(data):
-                    st.rerun()
+        st.divider()
+        if not db["requirements"]:
+            st.info("Danh sách đồ cần chuẩn bị đang trống.")
 
-        st.markdown("</div>", unsafe_allow_html=True)
-
-
-def render_requirements_tab(data, user):
-    st.subheader("🎒 Danh Sách Đồ Cần Mang & Phân Công")
-
-    with st.form("form_add_requirement_unique", clear_on_submit=True):
-        r_col1, r_col2 = st.columns([3, 2])
-        with r_col1:
-            new_task = st.text_input("Đồ dùng / Yêu cầu cần chuẩn bị", placeholder="Ví dụ: 5 thùng nước suối...")
-        with r_col2:
-            new_assigned = st.text_input("Người nhận lo", value=user, placeholder="Tên anh em...")
-        sub_req = st.form_submit_button("➕ Thêm Yêu Cầu")
-
-        if sub_req:
-            if new_task:
-                data["requirements"].append(
-                    {
-                        "task": new_task,
-                        "assigned": new_assigned or "Chưa phân công",
-                        "done": False,
-                    }
+        for i, req in enumerate(db["requirements"]):
+            rc1, rc2 = st.columns([4, 1])
+            with rc1:
+                checked = st.checkbox(
+                    f"**{req['task']}** — *(Phụ trách: {req['assigned']})*",
+                    value=req.get("done", False),
+                    key=f"chk_{i}",
                 )
-                if save_data(data):
-                    st.success("Đã thêm yêu cầu thành công!")
-                    st.rerun()
-            else:
-                st.warning("Vui lòng nhập nội dung vật dụng!")
-
-    st.markdown("### Danh sách đồ dùng:")
-    if not data["requirements"]:
-        st.info("Chưa có đồ dùng nào được thêm.")
-        return
-
+                if checked != req.get("done", False):
+                    db["requirements"][i]["done"] = checked
