@@ -1,4 +1,5 @@
 import hashlib
+import json
 import requests
 import streamlit as st
 
@@ -8,10 +9,14 @@ st.set_page_config(
     layout="centered",
 )
 
-# Địa chỉ API viết liền mạch, đảm bảo không bao giờ mất dấu '/'
+# Kho lưu trữ chính trên npoint.io của bạn
 API_URL = "https://npoint.io"
+HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "User-Agent": "Mozilla/5.0",
+}
 
-# Giao diện CSS Dark Mode hiện đại
 st.markdown(
     """
     <style>
@@ -54,7 +59,7 @@ def make_hash(text: str) -> str:
 def load_cloud() -> dict:
     default = {"users": {}, "locations": [], "requirements": []}
     try:
-        r = requests.get(API_URL, timeout=10)
+        r = requests.get(API_URL, headers=HEADERS, timeout=10)
         if r.status_code == 200:
             data = r.json()
             if isinstance(data, dict):
@@ -68,10 +73,18 @@ def load_cloud() -> dict:
 
 def save_cloud(data: dict) -> bool:
     try:
-        r = requests.post(API_URL, json=data, timeout=10)
+        payload = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        # npoint.io yêu cầu PUT kèm Content-Type: application/json để cập nhật Bin
+        r = requests.put(API_URL, data=payload, headers=HEADERS, timeout=10)
         if r.status_code == 200:
             return True
-        st.error(f"Lỗi lưu dữ liệu (Mã {r.status_code}): {r.text}")
+
+        # Thử lại bằng POST nếu PUT không được phép
+        r_post = requests.post(API_URL, data=payload, headers=HEADERS, timeout=10)
+        if r_post.status_code == 200:
+            return True
+
+        st.error(f"Máy chủ npoint.io báo lỗi (Mã {r.status_code}). Hãy thử tạo Bin mới trên npoint.io và dán ID vào code!")
         return False
     except Exception as e:
         st.error(f"Lỗi mạng: {e}")
@@ -194,7 +207,7 @@ else:
                 st.markdown(f'<span class="vote-badge">🔥 {len(voters)} phiếu bầu</span>', unsafe_allow_html=True)
                 st.caption(f"👤 Đã vote: {', '.join(voters) if voters else 'Chưa có ai'}")
 
-                c1, c2 = st.columns([4, 1])
+                c1, c2 = st.columns([4, 1.2])
                 with c1:
                     btn_text = "✅ Đã Vote (Bấm để hủy)" if voted else "👍 Bầu Chọn"
                     if st.button(btn_text, key=f"vote_{i}", use_container_width=True):
@@ -254,4 +267,3 @@ else:
     with t_mem:
         st.subheader(f"Danh sách đã đăng ký ({len(db['users'])} người)")
         for m in db["users"].keys():
-            st.write(f"👤 **{m}**")
