@@ -2,7 +2,7 @@ import hashlib
 import requests
 import streamlit as st
 
-st.set_page_config(page_title="Dã Ngoại & Sát Hạch 24/11", page_icon="⛺", layout="centered")
+st.set_page_config(page_title="ĐI CHƠIIIII", page_icon="⛺", layout="centered")
 
 BIN_ID = "6af5b874ffd5d16053bc0858"
 MASTER_KEY = "$2a$10$EpLPTXlcBTH5/mkxVMBLI.ZSv26QzgFaygkYFHZOa4V7OoVtsot12"
@@ -104,7 +104,6 @@ if st.session_state.user is None:
                             st.rerun()
 
     st.stop()
-
 me = st.session_state.user
 
 col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
@@ -214,18 +213,20 @@ with t_req:
                 current_db = load_cloud()
                 if i < len(current_db["requirements"]):
                     current_db["requirements"].pop(i)
-            if save_cloud(current_db):
-                st.rerun()
-        with t_mem:
-                all_members = list(db["users"].keys())
-                st.subheader(f"👥 Danh sách thành viên đã tham gia ({len(all_members)} người)")
-                if len(all_members) == 0:
-                    st.info("Chưa có thành viên nào đăng ký.")
-                else:
-                    for idx, member_name in enumerate(all_members, start=1):
-                        voted_places = [loc["name"] for loc in db["locations"] if member_name in loc.get("voters", [])]
-                        vote_status = f"✅ Đã vote: {', '.join(voted_places)}" if voted_places else "⏳ Chưa bình chọn địa điểm"
-                        assigned_tasks = [req["task"] for req in db["requirements"] if req.get("assigned") == member_name]
-                        task_status = f"🎒 Nhận lo ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ dùng"
-                        card_html = f'{idx}. 👤 {member_name}{vote_status}  |  {task_status}'
-                        st.markdown(card_html, unsafe_allow_html=True)
+                    if save_cloud(current_db):
+                        st.rerun()
+
+with t_mem:
+    all_members = list(db["users"].keys())
+    st.subheader(f"👥 Danh sách thành viên đã tham gia ({len(all_members)} người)")
+
+    if len(all_members) == 0:
+        st.info("Chưa có thành viên nào đăng ký.")
+    else:
+        for idx, member_name in enumerate(all_members, start=1):
+            voted_places = [loc["name"] for loc in db["locations"] if member_name in loc.get("voters", [])]
+            vote_status = f"✅ Đã vote: {', '.join(voted_places)}" if voted_places else "⏳ Chưa bình chọn địa điểm"
+            assigned_tasks = [req["task"] for req in db["requirements"] if req.get("assigned") == member_name]
+            task_status = f"🎒 Nhận lo ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ dùng"
+            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {task_status}</div></div>'
+            st.markdown(card_html, unsafe_allow_html=True)
