@@ -83,7 +83,7 @@ def fetch_cloud_data():
 def push_cloud_data(payload):
     try:
         res = requests.put(API_URL, json=payload, headers=HEADERS, timeout=10)
-        if res.status_code in:
+        if res.status_code in
                 return True
         st.error(f"Lỗi máy chủ (Mã {res.status_code}): {res.text}")
         return False
