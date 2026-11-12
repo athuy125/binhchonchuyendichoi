@@ -220,6 +220,9 @@ with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đã tham gia ({len(all_members)} người)")
 
+    if me == "athuy125":
+        st.info("👑 Bạn đang đăng nhập với quyền Quản trị viên (Admin). Bạn có thể xóa thành viên bên dưới.")
+
     if len(all_members) == 0:
         st.info("Chưa có thành viên nào đăng ký.")
     else:
@@ -228,5 +231,26 @@ with t_mem:
             vote_status = f"✅ Đã vote: {', '.join(voted_places)}" if voted_places else "⏳ Chưa bình chọn địa điểm"
             assigned_tasks = [req["task"] for req in db["requirements"] if req.get("assigned") == member_name]
             task_status = f"🎒 Nhận lo ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ dùng"
-            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {task_status}</div></div>'
-            st.markdown(card_html, unsafe_allow_html=True)
+
+            role_badge = " 👑 *(Admin)*" if member_name == "athuy125" else ""
+            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}{role_badge}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {task_status}</div></div>'
+
+            # Chỉ tài khoản athuy125 mới thấy cột nút xóa (và không hiện nút xóa cho chính mình)
+            if me == "athuy125" and member_name != "athuy125":
+                col_m1, col_m2 = st.columns([5, 1])
+                with col_m1:
+                    st.markdown(card_html, unsafe_allow_html=True)
+                with col_m2:
+                    if st.button("🗑️", key=f"del_user_{idx}", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        if member_name in current_db["users"]:
+                            del current_db["users"][member_name]
+                        for loc in current_db["locations"]:
+                            if member_name in loc.get("voters", []):
+                                loc["voters"].remove(member_name)
+                        if save_cloud(current_db):
+                            st.rerun()
+            else:
+                st.markdown(card_html, unsafe_allow_html=True)
+
