@@ -3,7 +3,7 @@ import requests
 import streamlit as st
 
 st.set_page_config(
-    page_title="Dã Ngoại & Sát Hạch 24/11",
+    page_title="ĐI CHƠIIIII",
     page_icon="⛺",
     layout="centered",
 )
@@ -41,6 +41,13 @@ st.markdown(
         font-size: 13px;
         font-weight: 700;
         margin-bottom: 8px;
+    }
+    .member-card {
+        background-color: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 10px;
     }
     div.stButton > button {
         border-radius: 10px;
@@ -261,9 +268,3 @@ with t_req:
         r1, r2 = st.columns([4.5, 1])
         with r1:
             chk = st.checkbox(
-                f"**{req['task']}** — *(Phụ trách: {req['assigned']})*",
-                value=req.get("done", False),
-                key=f"chk_{i}",
-            )
-            if chk != req.get("done", False):
-                load_cloud.clear()
