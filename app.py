@@ -8,16 +8,50 @@ st.set_page_config(
     layout="centered",
 )
 
-# Đã kiểm tra kỹ dấu gạch chéo '/' trong đường dẫn API
-BIN_ID = "827d1b013f00d93657e9"
-API_URL = "https://npoint.io" + BIN_ID
+# Địa chỉ API viết liền mạch, đảm bảo không bao giờ mất dấu '/'
+API_URL = "https://npoint.io"
+
+# Giao diện CSS Dark Mode hiện đại
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #0b1120;
+        color: #f8fafc;
+    }
+    .hero-banner {
+        background: linear-gradient(135deg, #059669 0%, #2563eb 100%);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 22px;
+        color: #ffffff;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    }
+    .vote-badge {
+        display: inline-block;
+        background-color: #064e3b;
+        color: #34d399;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    div.stButton > button {
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
-def make_hash(text):
+def make_hash(text: str) -> str:
     return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
 
-def load_cloud():
+def load_cloud() -> dict:
     default = {"users": {}, "locations": [], "requirements": []}
     try:
         r = requests.get(API_URL, timeout=10)
@@ -32,7 +66,7 @@ def load_cloud():
     return default
 
 
-def save_cloud(data):
+def save_cloud(data: dict) -> bool:
     try:
         r = requests.post(API_URL, json=data, timeout=10)
         if r.status_code == 200:
@@ -53,8 +87,17 @@ db = load_cloud()
 # MÀN HÌNH 1: ĐĂNG NHẬP / ĐĂNG KÝ
 # ==========================================
 if st.session_state.user is None:
-    st.title("⛺ CỔNG THÀNH VIÊN ĐỘI")
-    st.info("Vui lòng đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia kế hoạch 24/11.")
+    st.markdown(
+        """
+        <div class="hero-banner" style="text-align: center;">
+            <h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2>
+            <p style="margin:8px 0 0 0; opacity: 0.9;">
+                Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia kế hoạch 24/11
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     tab1, tab2 = st.tabs(["🔑 Đăng Nhập", "📝 Đăng Ký Lần Đầu"])
 
@@ -98,7 +141,7 @@ if st.session_state.user is None:
 else:
     me = st.session_state.user
 
-    col_a, col_b = st.columns([4, 1])
+    col_a, col_b = st.columns([4, 1.3])
     with col_a:
         st.success(f"🟢 Xin chào **{me}**! Dữ liệu đang đồng bộ trực tuyến.")
     with col_b:
@@ -106,9 +149,17 @@ else:
             st.session_state.user = None
             st.rerun()
 
-    st.header("⛺ DÃ NGOẠI & SÁT HẠCH TOÀN ĐỘI (24/11)")
-    st.write("Ngày **24/11** anh em nghỉ nguyên ngày để đi cắm trại kết hợp Vòng 2 sát hạch nhân sự mới.")
-    st.divider()
+    st.markdown(
+        """
+        <div class="hero-banner">
+            <h2 style="margin:0;">⛺ DÃ NGOẠI & SÁT HẠCH TOÀN ĐỘI (24/11)</h2>
+            <p style="margin:8px 0 0 0; font-size:15px;">
+                Ngày <b>24/11</b> anh em nghỉ nguyên ngày để đi cắm trại kết hợp Vòng 2 sát hạch nhân sự mới.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     t_loc, t_req, t_mem = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên"])
 
@@ -140,7 +191,8 @@ else:
             with st.container(border=True):
                 st.subheader(f"📍 {loc['name']}")
                 st.write(loc.get("desc", ""))
-                st.caption(f"🔥 **{len(voters)} phiếu** | Đã vote: {', '.join(voters) if voters else 'Chưa có ai'}")
+                st.markdown(f'<span class="vote-badge">🔥 {len(voters)} phiếu bầu</span>', unsafe_allow_html=True)
+                st.caption(f"👤 Đã vote: {', '.join(voters) if voters else 'Chưa có ai'}")
 
                 c1, c2 = st.columns([4, 1])
                 with c1:
@@ -181,7 +233,7 @@ else:
             st.info("Chưa có đồ dùng nào trong danh sách.")
 
         for i, req in enumerate(db["requirements"]):
-            r1, r2 = st.columns([5, 1])
+            r1, r2 = st.columns([4.5, 1])
             with r1:
                 chk = st.checkbox(
                     f"**{req['task']}** — *(Phụ trách: {req['assigned']})*",
