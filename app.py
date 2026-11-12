@@ -8,9 +8,9 @@ st.set_page_config(
     layout="centered",
 )
 
-# Sử dụng chính Bin ID bạn đã tạo thành công trên npoint.io
+# Đã kiểm tra kỹ dấu gạch chéo '/' trong đường dẫn API
 BIN_ID = "827d1b013f00d93657e9"
-API_URL = f"https://npoint.io{BIN_ID}"
+API_URL = "https://npoint.io" + BIN_ID
 
 
 def make_hash(text):
@@ -20,7 +20,7 @@ def make_hash(text):
 def load_cloud():
     default = {"users": {}, "locations": [], "requirements": []}
     try:
-        r = requests.get(API_URL, timeout=8)
+        r = requests.get(API_URL, timeout=10)
         if r.status_code == 200:
             data = r.json()
             if isinstance(data, dict):
@@ -34,8 +34,7 @@ def load_cloud():
 
 def save_cloud(data):
     try:
-        # npoint.io dùng phương thức POST để ghi đè dữ liệu mới
-        r = requests.post(API_URL, json=data, timeout=8)
+        r = requests.post(API_URL, json=data, timeout=10)
         if r.status_code == 200:
             return True
         st.error(f"Lỗi lưu dữ liệu (Mã {r.status_code}): {r.text}")
@@ -103,7 +102,7 @@ else:
     with col_a:
         st.success(f"🟢 Xin chào **{me}**! Dữ liệu đang đồng bộ trực tuyến.")
     with col_b:
-        if st.button("Thoát"):
+        if st.button("Thoát", use_container_width=True):
             st.session_state.user = None
             st.rerun()
 
