@@ -8,9 +8,9 @@ st.set_page_config(
     layout="centered",
 )
 
-# Sử dụng JSONBlob làm máy chủ lưu trữ đám mây ổn định cho Streamlit
-BLOB_ID = "1306249854114570240"
-API_URL = f"https://jsonblob.com{BLOB_ID}"
+# Sử dụng dịch vụ lưu trữ đám mây JSONBlob (tự động khởi tạo nếu chưa có)
+DEFAULT_BLOB_ID = "1306249854114570240"
+BASE_API = "https://jsonblob.com"
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -65,10 +65,17 @@ def make_hash(text):
     return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
 
+def get_active_url():
+    if "active_blob_url" not in st.session_state:
+        st.session_state.active_blob_url = f"{BASE_API}/{DEFAULT_BLOB_ID}"
+    return st.session_state.active_blob_url
+
+
 def fetch_cloud_data():
     default_data = {"users": {}, "locations": [], "requirements": []}
+    url = get_active_url()
     try:
-        res = requests.get(API_URL, headers=HEADERS, timeout=10)
+        res = requests.get(url, headers=HEADERS, timeout=10)
         if res.status_code == 200:
             raw = res.json()
             if isinstance(raw, dict):
@@ -81,11 +88,26 @@ def fetch_cloud_data():
 
 
 def push_cloud_data(payload):
+    url = get_active_url()
     try:
-        res = requests.put(API_URL, json=payload, headers=HEADERS, timeout=10)
-        if res.status_code in
+        # Thử cập nhật vào kho hiện tại
+        res = requests.put(url, json=payload, headers=HEADERS, timeout=10)
+        if res.status_code in (200, 201):
+            return True
+
+        # Nếu kho cũ bị khóa/không tồn tại (lỗi 404), tự động tạo kho mới
+        if res.status_code == 404:
+            create_res = requests.post(BASE_API, json=payload, headers=HEADERS, timeout=10)
+            if create_res.status_code in (200, 201):
+                new_loc = create_res.headers.get("Location") or create_res.headers.get("X-jsonblob")
+                if new_loc:
+                    if new_loc.startswith("http"):
+                        st.session_state.active_blob_url = new_loc
+                    else:
+                        st.session_state.active_blob_url = f"{BASE_API}/{new_loc}"
                 return True
-        st.error(f"Lỗi máy chủ (Mã {res.status_code}): {res.text}")
+
+        st.error(f"Lỗi máy chủ lưu trữ (Mã {res.status_code}): {res.text}")
         return False
     except Exception as e:
         st.error(f"Lỗi kết nối mạng: {e}")
@@ -246,26 +268,3 @@ else:
         with st.form("add_req", clear_on_submit=True):
             task_name = st.text_input("Món đồ / Công việc cần chuẩn bị", placeholder="Ví dụ: Lều trại, than nướng, nước suối...")
             person = st.text_input("Người phụ trách", value=me)
-            if st.form_submit_button("➕ Thêm Vào Danh Sách", use_container_width=True):
-                if task_name.strip():
-                    db["requirements"].append(
-                        {
-                            "task": task_name.strip(),
-                            "assigned": person.strip() or "Chưa phân công",
-                            "done": False,
-                        }
-                    )
-                    if push_cloud_data(db):
-                        st.rerun()
-                else:
-                    st.warning("Vui lòng nhập tên món đồ.")
-
-        st.divider()
-        if not db["requirements"]:
-            st.info("Danh sách đồ cần chuẩn bị đang trống.")
-
-        for i, req in enumerate(db["requirements"]):
-            rc1, rc2 = st.columns([4, 1])
-            with rc1:
-                checked = st.checkbox(
-                    f"**{req['task']}** — *(Phụ trách: {req['assigned']})*",
