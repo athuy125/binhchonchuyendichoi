@@ -3,17 +3,14 @@ import json
 import requests
 import streamlit as st
 
-# Cấu hình trang
 st.set_page_config(
     page_title="Sát Hạch & Cắm Trại 24/11 - Đội",
     page_icon="⛺",
     layout="wide",
 )
 
-# Bin ID mới của npoint.io
 BIN_ID = "827d1b013f00d93657e9"
 
-# Giao diện CSS tùy chỉnh Dark Mode hiện đại
 st.markdown(
     """
     <style>
@@ -60,12 +57,10 @@ st.markdown(
 )
 
 
-# Hàm mã hóa mật khẩu
 def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
-# Hàm tải dữ liệu từ Cloud
 def load_data():
     try:
         url = f"https://npoint.io{BIN_ID}"
@@ -85,17 +80,14 @@ def load_data():
     return {"users": {}, "locations": [], "requirements": []}
 
 
-# Hàm lưu dữ liệu lên Cloud
 def save_data(data):
     url = f"https://npoint.io{BIN_ID}"
     headers = {"Content-Type": "application/json"}
     try:
-        # Gửi dữ liệu bằng POST (chuẩn của npoint.io)
         response = requests.post(url, json=data, headers=headers, timeout=10)
         if response.status_code == 200:
             return True
 
-        # Dự phòng bằng PUT nếu POST bị từ chối
         response_put = requests.put(url, json=data, headers=headers, timeout=10)
         if response_put.status_code == 200:
             return True
@@ -107,18 +99,13 @@ def save_data(data):
         return False
 
 
-# Khởi tạo trạng thái phiên đăng nhập
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "current_user" not in st.session_state:
     st.session_state.current_user = ""
 
-# Tải dữ liệu từ Cloud
 data = load_data()
 
-# ==========================================
-# MÀN HÌNH 1: ĐĂNG KÝ / ĐĂNG NHẬP BẮT BUỘC
-# ==========================================
 if not st.session_state.logged_in:
     st.markdown("<br>", unsafe_allow_html=True)
     col_left, col_center, col_right = st.columns([1, 1.4, 1])
@@ -139,7 +126,6 @@ if not st.session_state.logged_in:
 
         tab_login, tab_register = st.tabs(["🔑 Đăng Nhập", "📝 Đăng Ký Tài Khoản Mới"])
 
-        # --- TAB ĐĂNG NHẬP ---
         with tab_login:
             with st.form("login_form"):
                 login_name = st.text_input(
@@ -164,7 +150,6 @@ if not st.session_state.logged_in:
                         else:
                             st.error("Mật khẩu không chính xác!")
 
-        # --- TAB ĐĂNG KÝ ---
         with tab_register:
             with st.form("register_form"):
                 reg_name = st.text_input(
@@ -196,14 +181,10 @@ if not st.session_state.logged_in:
                             st.success("Đăng ký thành công và đã lưu lên Cloud!")
                             st.rerun()
 
-# ==========================================
-# MÀN HÌNH 2: GIAO DIỆN CHÍNH SAU KHI ĐĂNG NHẬP
-# ==========================================
 else:
     user = st.session_state.current_user
 
-    # Thanh trên cùng hiển thị thông tin người dùng & nút đăng xuất
-    top_col1, top_col2 = st.columns([5, 1])
+    top_col1, top_col2 = st.columns([5, 1.5])
     with top_col1:
         st.markdown(f"🟢 **Xin chào, {user}!** | Dữ liệu đang đồng bộ trực tuyến.")
     with top_col2:
@@ -212,7 +193,6 @@ else:
             st.session_state.current_user = ""
             st.rerun()
 
-    # Banner tiêu đề
     st.markdown(
         """
         <div class="header-banner">
@@ -226,12 +206,10 @@ else:
         unsafe_allow_html=True,
     )
 
-    # Chia tab giao diện
     tab1, tab2, tab3 = st.tabs(
         ["🗳️ Bình Chọn Địa Điểm", "📋 Danh Sách Đồ Cần Chuẩn Bị", "👥 Thành Viên & Hướng Dẫn"]
     )
 
-    # --- TAB 1: BÌNH CHỌN ĐỊA ĐIỂM ---
     with tab1:
         st.subheader("📍 Đề Xuất & Bình Chọn Địa Điểm Cắm Trại")
 
@@ -271,3 +249,22 @@ else:
             st.info("Chưa có địa điểm nào được thêm. Hãy thêm địa điểm đầu tiên ở trên!")
 
         for idx, loc in enumerate(data["locations"]):
+            loc_id = loc.get("id", str(idx))
+            voters_list = loc.get("voters", [])
+            has_voted = user in voters_list
+
+            st.markdown('<div class="item-card">', unsafe_allow_html=True)
+            col1, col2, col3, col4 = st.columns([3, 3.5, 1.5, 2])
+
+            with col1:
+                st.markdown(f"#### 🔥 {loc['name']}")
+                if "created_by" in loc:
+                    st.caption(f"Đề xuất bởi: {loc['created_by']}")
+            with col2:
+                st.write(loc["desc"])
+                if voters_list:
+                    st.caption(f"👤 Đã vote ({len(voters_list)}): {', '.join(voters_list)}")
+            with col3:
+                st.metric("Số phiếu", loc["votes"])
+            with col4:
+                if not has_voted:
