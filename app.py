@@ -10,8 +10,8 @@ st.set_page_config(
     layout="wide",
 )
 
-# Bin ID của npoint.io
-BIN_ID = "89fea106b426901294dd"
+# Bin ID mới của npoint.io
+BIN_ID = "827d1b013f00d93657e9"
 
 # Giao diện CSS tùy chỉnh Dark Mode hiện đại
 st.markdown(
@@ -65,11 +65,11 @@ def hash_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
-# Hàm tải toàn bộ dữ liệu từ Cloud (bao gồm users, locations, requirements)
+# Hàm tải dữ liệu từ Cloud
 def load_data():
     try:
-        url = f"https://api.npoint.io/{BIN_ID}"
-        response = requests.get(url, timeout=6)
+        url = f"https://npoint.io{BIN_ID}"
+        response = requests.get(url, timeout=10)
         if response.status_code == 200:
             res_data = response.json()
             if isinstance(res_data, dict):
@@ -78,19 +78,32 @@ def load_data():
                     "locations": res_data.get("locations", []),
                     "requirements": res_data.get("requirements", []),
                 }
+        else:
+            st.warning(f"Cảnh báo tải dữ liệu (Mã {response.status_code}): {response.text}")
     except Exception as e:
         st.error(f"Lỗi kết nối Cloud: {e}")
     return {"users": {}, "locations": [], "requirements": []}
 
 
-# Hàm lưu toàn bộ dữ liệu lên Cloud
+# Hàm lưu dữ liệu lên Cloud
 def save_data(data):
+    url = f"https://npoint.io{BIN_ID}"
+    headers = {"Content-Type": "application/json"}
     try:
-        url = f"https://api.npoint.io/{BIN_ID}"
-        response = requests.put(url, json=data, timeout=6)
-        return response.status_code == 200
+        # Gửi dữ liệu bằng POST (chuẩn của npoint.io)
+        response = requests.post(url, json=data, headers=headers, timeout=10)
+        if response.status_code == 200:
+            return True
+
+        # Dự phòng bằng PUT nếu POST bị từ chối
+        response_put = requests.put(url, json=data, headers=headers, timeout=10)
+        if response_put.status_code == 200:
+            return True
+
+        st.error(f"Server từ chối lưu (Mã {response.status_code}): {response.text}")
+        return False
     except Exception as e:
-        st.error(f"Không thể lưu lên Cloud: {e}")
+        st.error(f"Lỗi mạng khi lưu lên Cloud: {e}")
         return False
 
 
@@ -174,17 +187,14 @@ if not st.session_state.logged_in:
                     elif reg_pass != reg_pass_confirm:
                         st.error("Mật khẩu xác nhận không khớp!")
                     elif reg_name in data["users"]:
-                        st.error("Tên này đã có người đăng ký! Vui lòng chọn tên khác (ví dụ thêm tên đệm) hoặc đăng nhập.")
+                        st.error("Tên này đã có người đăng ký! Vui lòng chọn tên khác hoặc đăng nhập.")
                     else:
-                        # Lưu tài khoản mới lên npoint.io
                         data["users"][reg_name] = hash_password(reg_pass)
                         if save_data(data):
                             st.session_state.logged_in = True
                             st.session_state.current_user = reg_name
                             st.success("Đăng ký thành công và đã lưu lên Cloud!")
                             st.rerun()
-                        else:
-                            st.error("Lỗi khi lưu tài khoản lên Cloud. Vui lòng thử lại!")
 
 # ==========================================
 # MÀN HÌNH 2: GIAO DIỆN CHÍNH SAU KHI ĐĂNG NHẬP
@@ -253,8 +263,6 @@ else:
                     if save_data(data):
                         st.success(f"Đã thêm địa điểm '{new_loc_name}' lên hệ thống!")
                         st.rerun()
-                    else:
-                        st.error("Lưu thất bại!")
                 else:
                     st.warning("Vui lòng nhập tên địa điểm!")
 
@@ -263,8 +271,3 @@ else:
             st.info("Chưa có địa điểm nào được thêm. Hãy thêm địa điểm đầu tiên ở trên!")
 
         for idx, loc in enumerate(data["locations"]):
-            loc_id = loc.get("id", str(idx))
-            voters_list = loc.get("voters", [])
-            has_voted = user in voters_list
-
-            st.markdown('<div class="item-card">', unsafe_allow_html=True)
