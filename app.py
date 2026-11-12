@@ -1,4 +1,5 @@
 import hashlib
+import json
 import requests
 import streamlit as st
 
@@ -8,13 +9,13 @@ st.set_page_config(
     layout="centered",
 )
 
-# Sử dụng dịch vụ lưu trữ đám mây JSONBlob (tự động khởi tạo nếu chưa có)
-DEFAULT_BLOB_ID = "1306249854114570240"
-BASE_API = "https://jsonblob.com"
+# Kho lưu trữ đám mây chung cho toàn đội qua KVDB.io (Miễn phí, ổn định, không chặn Streamlit)
+BUCKET_ID = "9W8xK2mP7vL4qR9tY3nB6z"
+KEY_NAME = "camping_team_2411_data"
+CLOUD_URL = f"https://kvdb.io{BUCKET_ID}/{KEY_NAME}"
 
 HEADERS = {
     "Content-Type": "application/json",
-    "Accept": "application/json",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
 }
 
@@ -61,22 +62,15 @@ st.markdown(
 )
 
 
-def make_hash(text):
+def make_hash(text: str) -> str:
     return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
 
-def get_active_url():
-    if "active_blob_url" not in st.session_state:
-        st.session_state.active_blob_url = f"{BASE_API}/{DEFAULT_BLOB_ID}"
-    return st.session_state.active_blob_url
-
-
-def fetch_cloud_data():
+def fetch_cloud_data() -> dict:
     default_data = {"users": {}, "locations": [], "requirements": []}
-    url = get_active_url()
     try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
-        if res.status_code == 200:
+        res = requests.get(CLOUD_URL, headers=HEADERS, timeout=10)
+        if res.status_code == 200 and res.text.strip():
             raw = res.json()
             if isinstance(raw, dict):
                 default_data["users"] = raw.get("users", {})
@@ -87,26 +81,16 @@ def fetch_cloud_data():
     return default_data
 
 
-def push_cloud_data(payload):
-    url = get_active_url()
+def push_cloud_data(payload: dict) -> bool:
     try:
-        # Thử cập nhật vào kho hiện tại
-        res = requests.put(url, json=payload, headers=HEADERS, timeout=10)
-        if res.status_code in (200, 201):
+        res = requests.post(
+            CLOUD_URL,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers=HEADERS,
+            timeout=10,
+        )
+        if res.status_code in (200, 201, 204):
             return True
-
-        # Nếu kho cũ bị khóa/không tồn tại (lỗi 404), tự động tạo kho mới
-        if res.status_code == 404:
-            create_res = requests.post(BASE_API, json=payload, headers=HEADERS, timeout=10)
-            if create_res.status_code in (200, 201):
-                new_loc = create_res.headers.get("Location") or create_res.headers.get("X-jsonblob")
-                if new_loc:
-                    if new_loc.startswith("http"):
-                        st.session_state.active_blob_url = new_loc
-                    else:
-                        st.session_state.active_blob_url = f"{BASE_API}/{new_loc}"
-                return True
-
         st.error(f"Lỗi máy chủ lưu trữ (Mã {res.status_code}): {res.text}")
         return False
     except Exception as e:
@@ -172,7 +156,7 @@ if st.session_state.user is None:
                     db["users"][new_name] = make_hash(new_pass)
                     if push_cloud_data(db):
                         st.session_state.user = new_name
-                        st.success("Đăng ký thành công!")
+                        st.success("Đăng ký thành công và đã lưu online!")
                         st.rerun()
 
 # ==========================================
@@ -181,9 +165,9 @@ if st.session_state.user is None:
 else:
     me = st.session_state.user
 
-    c1, c2 = st.columns([3, 1])
+    c1, c2 = st.columns([4, 1.5])
     with c1:
-        st.markdown(f"🟢 Xin chào, **{me}**!")
+        st.markdown(f"🟢 Xin chào, **{me}**! *(Đã đồng bộ Cloud)*")
     with c2:
         if st.button("Đăng xuất", use_container_width=True):
             st.session_state.user = None
@@ -245,7 +229,7 @@ else:
                 unsafe_allow_html=True,
             )
 
-            b1, b2 = st.columns([3, 1])
+            b1, b2 = st.columns([4, 1.2])
             with b1:
                 label = "✅ Đã Vote (Bấm để hủy)" if voted else "👍 Bầu Chọn Địa Điểm Này"
                 if st.button(label, key=f"v_{i}", use_container_width=True):
@@ -268,3 +252,19 @@ else:
         with st.form("add_req", clear_on_submit=True):
             task_name = st.text_input("Món đồ / Công việc cần chuẩn bị", placeholder="Ví dụ: Lều trại, than nướng, nước suối...")
             person = st.text_input("Người phụ trách", value=me)
+            if st.form_submit_button("➕ Thêm Vào Danh Sách", use_container_width=True):
+                if task_name.strip():
+                    db["requirements"].append(
+                        {
+                            "task": task_name.strip(),
+                            "assigned": person.strip() or "Chưa phân công",
+                            "done": False,
+                        }
+                    )
+                    if push_cloud_data(db):
+                        st.rerun()
+                else:
+                    st.warning("Vui lòng nhập tên món đồ.")
+
+        st.divider()
+        if not db["requirements"]:
