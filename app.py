@@ -534,21 +534,123 @@ with t_loc:
                         if save_cloud(current_db):
                             st.rerun()
 with t_req:
-    with st.form("add_req_form", clear_on_submit=True):
-        t_name = st.text_input("Đồ dùng / Công việc cần lo", placeholder="Ví dụ: 5 thùng nước suối...")
-        t_who = st.text_input("Người nhận việc", value=me)
-        if st.form_submit_button("➕ Thêm Vào Danh Sách", use_container_width=True):
-            if t_name.strip():
+    if is_admin:
+        with st.expander("⚡ Nạp nhanh danh sách mẫu (Như bảng chuẩn)", expanded=False):
+            st.caption("Bấm nút dưới đây để tự động thêm toàn bộ các mục nhu yếu phẩm, thức ăn, dụng cụ vào chuyến đi này (vẫn giữ nguyên các món cũ).")
+            if st.button("📥 Nạp danh sách mẫu vào chuyến đi", key="load_sample_reqs", use_container_width=True):
                 load_cloud.clear()
                 current_db = load_cloud()
-                assigned_person = t_who.strip() or "Chưa phân công"
-                new_req = {"task": t_name.strip(), "assigned": assigned_person, "done": False}
-                current_db["trips"][cur_trip]["requirements"].append(new_req)
-                add_log(current_db, f"🎒 **{me}** đã thêm đồ cần chuẩn bị: **{t_name.strip()}** (Phụ trách: *{assigned_person}*) trong *{cur_trip}*.")
+                sample_items = [
+                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Đèn Pin", "qty_note": "Nhà ai có góp vô càng nhiều càng tốt (vì dự kiến sẽ đi vào lúc sáng sớm).", "assigned": "Mọi người cùng góp", "done": False},
+                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Dụng cụ y tế cần thiết", "qty_note": "Ai có thì cứ mang càng nhiều càng tốt, không có thì nhóm sẽ chi tiền ra đi mua.", "assigned": "Mọi người cùng góp", "done": False},
+                    {"category": "🍖 Thức Ăn & Nước Uống", "task": "Nước uống", "qty_note": "Dự kiến 2 thùng 20 lít và nước ngọt các loại.", "assigned": "Chưa phân công", "done": False},
+                    {"category": "🍖 Thức Ăn & Nước Uống", "task": "Thức Ăn Chính & Đồ Nướng", "qty_note": "Lên thực đơn và chia nhóm đi chợ chuẩn bị.", "assigned": "Chưa phân công", "done": False},
+                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Dao Kéo", "qty_note": "Ai đóng góp thì nhắn cho Gia Huy để kiểm kê lại.", "assigned": "Gia Huy (Kiểm kê)", "done": False},
+                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Đồ Dùng Thiết Yếu Cá Nhân", "qty_note": "Phần này mn tự lo muốn mang gì thì mang (tránh mang đồ không cần thiết gây nặng và mất diện tích).", "assigned": "Tự túc cá nhân", "done": False},
+                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Thiết Bị Điện (sạc dự phòng, dây sạc,...)", "qty_note": "Ai có thì cứ mang càng nhiều càng tốt.", "assigned": "Mọi người cùng góp", "done": False},
+                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Dụng cụ nấu ăn", "qty_note": "Hiện tại có Hoàng Phát lo, nhưng vẫn cần thêm (ai góp gì báo Gia Huy kiểm kê lại).", "assigned": "Hoàng Phát", "done": False},
+                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Than", "qty_note": "Dự kiến là 2-3 Kg. Ai nhà có và muốn đóng góp thì ib Gia Huy.", "assigned": "Gia Huy (Kiểm kê)", "done": False},
+                ]
+                current_db["trips"][cur_trip]["requirements"].extend(sample_items)
+                add_log(current_db, f"📋 **{me}** đã nạp danh sách nhu yếu phẩm & dụng cụ chuẩn cho *{cur_trip}*.")
                 if save_cloud(current_db):
+                    st.success("Đã nạp danh sách thành công!")
                     st.rerun()
-            else:
-                st.warning("Vui lòng nhập tên đồ dùng!")
+
+    with st.expander("➕ Thêm Nhu Yếu Phẩm / Vật Dụng Mới", expanded=False):
+        with st.form("add_req_form", clear_on_submit=True):
+            cat_choice = st.selectbox("Phân loại mục", ["📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"])
+            t_name = st.text_input("Tên vật dụng / nhu yếu phẩm", placeholder="Ví dụ: Đèn pin, Than, Thùng nước 20L...")
+            t_qty = st.text_area("Số lượng / Ghi chú chi tiết (SL)", placeholder="Ví dụ: Dự kiến 2-3 Kg, ai có góp thêm thì báo lại...", height=80)
+            t_who = st.text_input("Người phụ trách / Đóng góp", value=me)
+            if st.form_submit_button("✅ Lưu Vào Bảng Chuẩn Bị", use_container_width=True):
+                if t_name.strip():
+                    load_cloud.clear()
+                    current_db = load_cloud()
+                    assigned_person = t_who.strip() or "Chưa phân công"
+                    new_req = {
+                        "category": cat_choice,
+                        "task": t_name.strip(),
+                        "qty_note": t_qty.strip() or "Theo thực tế",
+                        "assigned": assigned_person,
+                        "done": False,
+                    }
+                    current_db["trips"][cur_trip]["requirements"].append(new_req)
+                    add_log(current_db, f"🎒 **{me}** đã thêm mục **{t_name.strip()}** ({cat_choice}) trong *{cur_trip}*.")
+                    if save_cloud(current_db):
+                        st.rerun()
+                else:
+                    st.warning("Vui lòng nhập tên vật dụng!")
+
+    st.divider()
+    reqs = trip_data.get("requirements", [])
+    if len(reqs) == 0:
+        st.info("Chưa có đồ dùng nào trong danh sách của chuyến đi này.")
+    else:
+        categories_order = ["📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"]
+        existing_cats = []
+        for r in reqs:
+            c_name = r.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng")
+            if c_name not in existing_cats:
+                existing_cats.append(c_name)
+        all_cats = [c for c in categories_order if c in existing_cats] + [c for c in existing_cats if c not in categories_order]
+
+        for cat_title in all_cats:
+            st.markdown(f"### {cat_title}")
+            for i, req in enumerate(reqs):
+                if req.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng") != cat_title:
+                    continue
+
+                with st.container(border=True):
+                    top_r1, top_r2 = st.columns([4.8, 0.8])
+                    with top_r1:
+                        chk = st.checkbox(f"**{req['task']}**", value=req.get("done", False), key=f"chk_{i}")
+                        if chk != req.get("done", False):
+                            load_cloud.clear()
+                            current_db = load_cloud()
+                            t_reqs = current_db["trips"][cur_trip]["requirements"]
+                            if i < len(t_reqs):
+                                t_reqs[i]["done"] = chk
+                                status_txt = "đã chuẩn bị xong" if chk else "đang chuẩn bị"
+                                add_log(current_db, f"✅ **{me}** đánh dấu mục **{t_reqs[i]['task']}** ({status_txt}) trong *{cur_trip}*.")
+                                if save_cloud(current_db):
+                                    st.rerun()
+                    with top_r2:
+                        if st.button("🗑️", key=f"del_req_{i}", use_container_width=True):
+                            load_cloud.clear()
+                            current_db = load_cloud()
+                            t_reqs = current_db["trips"][cur_trip]["requirements"]
+                            if i < len(t_reqs):
+                                del_task = t_reqs[i]["task"]
+                                t_reqs.pop(i)
+                                add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_task}** khỏi bảng chuẩn bị (*{cur_trip}*).")
+                                if save_cloud(current_db):
+                                    st.rerun()
+
+                    note_val = req.get("qty_note", "").strip()
+                    if note_val:
+                        st.markdown(f"📝 **SL / Ghi chú:** {html.escape(note_val)}")
+
+                    bot_r1, bot_r2 = st.columns([3.6, 1.8])
+                    with bot_r1:
+                        st.caption(f"👤 **Phụ trách / Góp:** {req.get('assigned', 'Chưa phân công')}")
+                    with bot_r2:
+                        cur_assigned = req.get("assigned", "")
+                        if me not in cur_assigned:
+                            if st.button("🙋‍♂️ Tôi góp", key=f"join_req_{i}", use_container_width=True):
+                                load_cloud.clear()
+                                current_db = load_cloud()
+                                t_reqs = current_db["trips"][cur_trip]["requirements"]
+                                if i < len(t_reqs):
+                                    old_a = t_reqs[i].get("assigned", "").strip()
+                                    if not old_a or old_a == "Chưa phân công":
+                                        t_reqs[i]["assigned"] = me
+                                    else:
+                                        t_reqs[i]["assigned"] = f"{old_a}, {me}"
+                                    add_log(current_db, f"🙋‍♂️ **{me}** đã đăng ký góp thêm cho mục **{t_reqs[i]['task']}** (*{cur_trip}*).")
+                                    if save_cloud(current_db):
+                                        st.rerun()
+
 
     st.divider()
     reqs = trip_data.get("requirements", [])
