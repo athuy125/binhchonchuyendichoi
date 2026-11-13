@@ -60,6 +60,10 @@ def add_log(data_dict: dict, msg: str, is_important: bool = False):
     data_dict["notifications"] = logs[:40]
     plain_msg = msg.replace("**", "").replace("*", "")
     send_external_push(data_dict, plain_msg)
+import extra_streamlit_components as stx
+
+cookie_manager = stx.CookieManager(key="team_auth_cookie")
+
 
 def trigger_browser_push(notif_item):
     if isinstance(notif_item, list):
