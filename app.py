@@ -233,6 +233,7 @@ all_notifs = db.get("notifications", [])
 if all_notifs:
     trigger_browser_push(all_notifs)
 
+
 col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
 with col_a:
     st.success(f"🟢 Xin chào **{me}**!")
