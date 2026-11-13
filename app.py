@@ -63,10 +63,12 @@ def add_log(data_dict: dict, msg: str, is_important: bool = False):
 
 def trigger_browser_push(notif_item):
     if isinstance(notif_item, list):
-        notif_item = notif_item if notif_item else None
+        notif_item = notif_item[0] if notif_item else None
     if not isinstance(notif_item, dict):
         return
-
+    nid = notif_item.get("id", "")
+    if st.session_state.get("last_pushed_id") == nid:
+        return
     st.session_state.last_pushed_id = nid
     safe_text = notif_item.get("msg", "").replace('"', '\\"').replace("\n", " ").replace("**", "")
     js_code = f"""
@@ -74,18 +76,11 @@ def trigger_browser_push(notif_item):
     if ("Notification" in window) {{
         if (Notification.permission === "granted") {{
             new Notification("⛺ Thông báo từ Đội", {{ body: "{safe_text}" }});
-        }} else if (Notification.permission !== "denied") {{
-            Notification.requestPermission().then(function(p) {{
-                if (p === "granted") {{
-                    new Notification("⛺ Thông báo từ Đội", {{ body: "{safe_text}" }});
-                }}
-            }});
         }}
     }}
     </script>
     """
     components.html(js_code, height=0)
-
 @st.cache_data(ttl=10, show_spinner=False)
 def load_cloud() -> dict:
     default = {"users": {}, "sessions": {}, "trips": {}, "notifications": [], "config": {}}
@@ -144,6 +139,22 @@ if st.session_state.user is None:
         if auto_user in db.get("users", {}):
             st.session_state.user = auto_user
             st.rerun()
+    elif not saved_token:
+        components.html(
+            """
+            <script>
+            const tk = localStorage.getItem("team_trip_token");
+            if (tk) {
+                const url = new URL(window.parent.location.href);
+                if (!url.searchParams.get("token")) {
+                    url.searchParams.set("token", tk);
+                    window.parent.location.replace(url.toString());
+                }
+            }
+            </script>
+            """,
+            height=0,
+        )
 if st.session_state.user is None:
     AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
     st.markdown(AUTH_HTML, unsafe_allow_html=True)
@@ -153,7 +164,7 @@ if st.session_state.user is None:
         with st.form("login_box"):
             name = st.text_input("Tên của bạn", placeholder="Nhập tên đã đăng ký...").strip()
             pwd = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
-            remember_in = st.checkbox("💾 Ghi nhớ đăng nhập trên thiết bị này", value=True)
+            remember_in = st.checkbox("💾 Ghi nhớ đăng nhập vĩnh viễn trên máy này", value=True)
             if st.form_submit_button("🚀 Vào Hệ Thống", use_container_width=True):
                 if not name or not pwd:
                     st.warning("Vui lòng nhập đủ tên và mật khẩu!")
@@ -170,6 +181,7 @@ if st.session_state.user is None:
                             fresh_db.setdefault("sessions", {})[new_tk] = name
                             save_cloud(fresh_db)
                             st.query_params["token"] = new_tk
+                            st.session_state.save_ls_token = new_tk
                         st.session_state.user = name
                         st.rerun()
 
@@ -178,7 +190,7 @@ if st.session_state.user is None:
             r_name = st.text_input("Tên hiển thị của bạn", placeholder="Ví dụ: Huy Đỗ...").strip()
             r_pwd = st.text_input("Tạo mật khẩu", type="password")
             r_pwd2 = st.text_input("Nhập lại mật khẩu", type="password")
-            remember_up = st.checkbox("💾 Ghi nhớ đăng nhập sau khi đăng ký", value=True)
+            remember_up = st.checkbox("💾 Ghi nhớ đăng nhập vĩnh viễn trên máy này", value=True)
             if st.form_submit_button("✅ Đăng Ký & Lưu Online", use_container_width=True):
                 if not r_name or not r_pwd:
                     st.warning("Không được để trống tên hoặc mật khẩu!")
@@ -195,6 +207,7 @@ if st.session_state.user is None:
                             new_tk = secrets.token_hex(12)
                             fresh_db.setdefault("sessions", {})[new_tk] = r_name
                             st.query_params["token"] = new_tk
+                            st.session_state.save_ls_token = new_tk
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.session_state.user = r_name
@@ -202,6 +215,9 @@ if st.session_state.user is None:
                             st.rerun()
 
     st.stop()
+if st.session_state.get("save_ls_token"):
+    tk_val = st.session_state.pop("save_ls_token")
+    components.html(f'<script>localStorage.setItem("team_trip_token", "{tk_val}");</script>', height=0)
 
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
@@ -231,8 +247,7 @@ if need_deadline_save:
 
 all_notifs = db.get("notifications", [])
 if all_notifs:
-    trigger_browser_push(all_notifs)
-
+    trigger_browser_push(all_notifs[0])
 
 col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
 with col_a:
@@ -251,6 +266,7 @@ with col_c:
                 del clean_db["sessions"][cur_tk]
                 save_cloud(clean_db)
             st.query_params.clear()
+        components.html('<script>localStorage.removeItem("team_trip_token");</script>', height=0)
         st.session_state.user = None
         st.session_state.selected_trip = None
         st.rerun()
@@ -265,9 +281,6 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
         """,
         height=38,
     )
-
-
-
 
     if is_admin:
         with st.form("admin_broadcast_form", clear_on_submit=True):
@@ -286,7 +299,7 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
         with st.expander("⚙️ Cài đặt gửi thông báo về điện thoại (Khi tắt web)", expanded=False):
             with st.form("webhook_cfg_form"):
                 cur_cfg = db.get("config", {})
-                in_discord = st.text_input("Link Discord Webhook nhóm đội (Tùy chọn)", value=cur_cfg.get("discord_webhook", ""), placeholder="https://discord.com...")
+                in_discord = st.text_input("Link Discord Webhook nhóm đội", value=cur_cfg.get("discord_webhook", ""), placeholder="https://discord.com...")
                 in_tg_tk = st.text_input("Telegram Bot Token (Tùy chọn)", value=cur_cfg.get("tg_token", ""), placeholder="123456:ABC-DEF...")
                 in_tg_id = st.text_input("Telegram Chat ID nhóm đội (Tùy chọn)", value=cur_cfg.get("tg_chat_id", ""), placeholder="-100123456789")
                 if st.form_submit_button("💾 Lưu cấu hình thông báo ngoài web", use_container_width=True):
@@ -536,7 +549,7 @@ with t_loc:
 with t_req:
     if is_admin:
         with st.expander("⚡ Nạp nhanh danh sách mẫu (Như bảng chuẩn)", expanded=False):
-            st.caption("Bấm nút dưới đây để tự động thêm toàn bộ các mục nhu yếu phẩm, thức ăn, dụng cụ vào chuyến đi này (vẫn giữ nguyên các món cũ).")
+            st.caption("Tự động thêm toàn bộ các mục nhu yếu phẩm, thức ăn, dụng cụ vào chuyến đi này (vẫn giữ nguyên các món cũ).")
             if st.button("📥 Nạp danh sách mẫu vào chuyến đi", key="load_sample_reqs", use_container_width=True):
                 load_cloud.clear()
                 current_db = load_cloud()
@@ -581,7 +594,6 @@ with t_req:
                         st.rerun()
                 else:
                     st.warning("Vui lòng nhập tên vật dụng!")
-
     st.divider()
     reqs = trip_data.get("requirements", [])
     if len(reqs) == 0:
@@ -604,7 +616,7 @@ with t_req:
                 with st.container(border=True):
                     top_r1, top_r2 = st.columns([4.8, 0.8])
                     with top_r1:
-                        chk = st.checkbox(f"**{req['task']}**", value=req.get("done", False), key=f"chk_{i}")
+                        chk = st.checkbox(f"**{req['task']}**", value=req.get("done", False), key=f"req_chk_{cur_trip}_{i}")
                         if chk != req.get("done", False):
                             load_cloud.clear()
                             current_db = load_cloud()
@@ -616,7 +628,7 @@ with t_req:
                                 if save_cloud(current_db):
                                     st.rerun()
                     with top_r2:
-                        if st.button("🗑️", key=f"del_req_{i}", use_container_width=True):
+                        if st.button("🗑️", key=f"req_del_{cur_trip}_{i}", use_container_width=True):
                             load_cloud.clear()
                             current_db = load_cloud()
                             t_reqs = current_db["trips"][cur_trip]["requirements"]
@@ -637,7 +649,7 @@ with t_req:
                     with bot_r2:
                         cur_assigned = req.get("assigned", "")
                         if me not in cur_assigned:
-                            if st.button("🙋‍♂️ Tôi góp", key=f"join_req_{i}", use_container_width=True):
+                            if st.button("🙋‍♂️ Tôi góp", key=f"req_join_{cur_trip}_{i}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_reqs = current_db["trips"][cur_trip]["requirements"]
@@ -650,39 +662,6 @@ with t_req:
                                     add_log(current_db, f"🙋‍♂️ **{me}** đã đăng ký góp thêm cho mục **{t_reqs[i]['task']}** (*{cur_trip}*).")
                                     if save_cloud(current_db):
                                         st.rerun()
-
-
-    st.divider()
-    reqs = trip_data.get("requirements", [])
-    if len(reqs) == 0:
-        st.info("Chưa có đồ dùng nào trong danh sách của chuyến đi này.")
-
-    for i, req in enumerate(reqs):
-        r1, r2 = st.columns([4.5, 1])
-        with r1:
-            label_text = f"**{req['task']}** — *(Phụ trách: {req['assigned']})*"
-            chk = st.checkbox(label_text, value=req.get("done", False), key=f"chk_{i}")
-            if chk != req.get("done", False):
-                load_cloud.clear()
-                current_db = load_cloud()
-                t_reqs = current_db["trips"][cur_trip]["requirements"]
-                if i < len(t_reqs):
-                    t_reqs[i]["done"] = chk
-                    status_txt = "đã chuẩn bị xong" if chk else "đang chuẩn bị"
-                    add_log(current_db, f"✅ **{me}** đánh dấu món **{t_reqs[i]['task']}** ({status_txt}) trong *{cur_trip}*.")
-                    if save_cloud(current_db):
-                        st.rerun()
-        with r2:
-            if st.button("🗑️", key=f"del_req_{i}", use_container_width=True):
-                load_cloud.clear()
-                current_db = load_cloud()
-                t_reqs = current_db["trips"][cur_trip]["requirements"]
-                if i < len(t_reqs):
-                    del_task = t_reqs[i]["task"]
-                    t_reqs.pop(i)
-                    add_log(current_db, f"🗑️ **{me}** đã xóa món **{del_task}** khỏi danh sách (*{cur_trip}*).")
-                    if save_cloud(current_db):
-                        st.rerun()
 
 with t_mem:
     all_members = list(db["users"].keys())
@@ -719,7 +698,7 @@ with t_mem:
         for idx, member_name in enumerate(all_members, start=1):
             voted_places = [loc["name"] for loc in locs if member_name in loc.get("voters", [])]
             vote_status = f"✅ Đã vote: {', '.join(voted_places)}" if voted_places else "⏳ Chưa bình chọn địa điểm"
-            assigned_tasks = [req["task"] for req in reqs if req.get("assigned") == member_name]
+            assigned_tasks = [req["task"] for req in reqs if member_name in req.get("assigned", "")]
             task_status = f"🎒 Nhận lo ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ dùng"
 
             card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {task_status}</div></div>'
