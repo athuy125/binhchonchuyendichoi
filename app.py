@@ -2,6 +2,8 @@ import datetime
 import hashlib
 import html
 import secrets
+import time
+import extra_streamlit_components as stx
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -60,10 +62,6 @@ def add_log(data_dict: dict, msg: str, is_important: bool = False):
     data_dict["notifications"] = logs[:40]
     plain_msg = msg.replace("**", "").replace("*", "")
     send_external_push(data_dict, plain_msg)
-import extra_streamlit_components as stx
-
-cookie_manager = stx.CookieManager(key="team_auth_cookie")
-
 
 def trigger_browser_push(notif_item):
     if isinstance(notif_item, list):
@@ -129,6 +127,8 @@ def save_cloud(data: dict) -> bool:
         st.error(f"Lỗi mạng: {e}")
         return False
 
+cookie_manager = stx.CookieManager(key="team_auth_cookie")
+
 if "user" not in st.session_state:
     st.session_state.user = None
 if "selected_trip" not in st.session_state:
@@ -137,28 +137,12 @@ if "selected_trip" not in st.session_state:
 db = load_cloud()
 
 if st.session_state.user is None:
-    saved_token = st.query_params.get("token", "")
-    if saved_token and saved_token in db.get("sessions", {}):
-        auto_user = db["sessions"][saved_token]
+    cookie_token = cookie_manager.get("team_trip_session")
+    if cookie_token and cookie_token in db.get("sessions", {}):
+        auto_user = db["sessions"][cookie_token]
         if auto_user in db.get("users", {}):
             st.session_state.user = auto_user
             st.rerun()
-    elif not saved_token:
-        components.html(
-            """
-            <script>
-            const tk = localStorage.getItem("team_trip_token");
-            if (tk) {
-                const url = new URL(window.parent.location.href);
-                if (!url.searchParams.get("token")) {
-                    url.searchParams.set("token", tk);
-                    window.parent.location.replace(url.toString());
-                }
-            }
-            </script>
-            """,
-            height=0,
-        )
 if st.session_state.user is None:
     AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
     st.markdown(AUTH_HTML, unsafe_allow_html=True)
@@ -168,7 +152,7 @@ if st.session_state.user is None:
         with st.form("login_box"):
             name = st.text_input("Tên của bạn", placeholder="Nhập tên đã đăng ký...").strip()
             pwd = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
-            remember_in = st.checkbox("💾 Ghi nhớ đăng nhập vĩnh viễn trên máy này", value=True)
+            remember_in = st.checkbox("💾 Ghi nhớ đăng nhập vĩnh viễn trên thiết bị này", value=True)
             if st.form_submit_button("🚀 Vào Hệ Thống", use_container_width=True):
                 if not name or not pwd:
                     st.warning("Vui lòng nhập đủ tên và mật khẩu!")
@@ -181,11 +165,12 @@ if st.session_state.user is None:
                         st.error("Mật khẩu không đúng!")
                     else:
                         if remember_in:
-                            new_tk = secrets.token_hex(12)
+                            new_tk = secrets.token_hex(16)
                             fresh_db.setdefault("sessions", {})[new_tk] = name
                             save_cloud(fresh_db)
-                            st.query_params["token"] = new_tk
-                            st.session_state.save_ls_token = new_tk
+                            exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
+                            cookie_manager.set("team_trip_session", new_tk, expires_at=exp_date)
+                            time.sleep(0.5)
                         st.session_state.user = name
                         st.rerun()
 
@@ -194,7 +179,7 @@ if st.session_state.user is None:
             r_name = st.text_input("Tên hiển thị của bạn", placeholder="Ví dụ: Huy Đỗ...").strip()
             r_pwd = st.text_input("Tạo mật khẩu", type="password")
             r_pwd2 = st.text_input("Nhập lại mật khẩu", type="password")
-            remember_up = st.checkbox("💾 Ghi nhớ đăng nhập vĩnh viễn trên máy này", value=True)
+            remember_up = st.checkbox("💾 Ghi nhớ đăng nhập vĩnh viễn trên thiết bị này", value=True)
             if st.form_submit_button("✅ Đăng Ký & Lưu Online", use_container_width=True):
                 if not r_name or not r_pwd:
                     st.warning("Không được để trống tên hoặc mật khẩu!")
@@ -208,21 +193,18 @@ if st.session_state.user is None:
                     else:
                         fresh_db["users"][r_name] = make_hash(r_pwd)
                         if remember_up:
-                            new_tk = secrets.token_hex(12)
+                            new_tk = secrets.token_hex(16)
                             fresh_db.setdefault("sessions", {})[new_tk] = r_name
-                            st.query_params["token"] = new_tk
-                            st.session_state.save_ls_token = new_tk
+                            exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
+                            cookie_manager.set("team_trip_session", new_tk, expires_at=exp_date)
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
+                            time.sleep(0.5)
                             st.session_state.user = r_name
                             st.success("Đăng ký thành công!")
                             st.rerun()
 
     st.stop()
-if st.session_state.get("save_ls_token"):
-    tk_val = st.session_state.pop("save_ls_token")
-    components.html(f'<script>localStorage.setItem("team_trip_token", "{tk_val}");</script>', height=0)
-
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
 
@@ -262,19 +244,18 @@ with col_b:
         st.rerun()
 with col_c:
     if st.button("Thoát", use_container_width=True):
-        cur_tk = st.query_params.get("token", "")
+        cur_tk = cookie_manager.get("team_trip_session")
         if cur_tk:
             load_cloud.clear()
             clean_db = load_cloud()
             if cur_tk in clean_db.get("sessions", {}):
                 del clean_db["sessions"][cur_tk]
                 save_cloud(clean_db)
-            st.query_params.clear()
-        components.html('<script>localStorage.removeItem("team_trip_token");</script>', height=0)
+            cookie_manager.delete("team_trip_session")
+            time.sleep(0.5)
         st.session_state.user = None
         st.session_state.selected_trip = None
         st.rerun()
-
 with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đội", expanded=True):
     components.html(
         """
