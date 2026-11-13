@@ -1,4 +1,5 @@
 import hashlib
+import html
 import requests
 import streamlit as st
 
@@ -13,7 +14,10 @@ HEADERS = {"Content-Type": "application/json", "X-Master-Key": MASTER_KEY}
 CSS_STYLE = """
 <style>
 .stApp { background-color: #0b1120; color: #f8fafc; }
-.hero-banner { background: linear-gradient(135deg, #059669 0%, #2563eb 100%); border-radius: 16px; padding: 24px; margin-bottom: 22px; color: #ffffff; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); }
+.hero-banner { background: linear-gradient(135deg, #059669 0%, #2563eb 100%); border-radius: 16px; padding: 22px; margin-bottom: 16px; color: #ffffff; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); }
+.notice-board { background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid #f59e0b; border-left: 6px solid #f59e0b; border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 6px 18px rgba(245, 158, 11, 0.18); }
+.notice-title { color: #fbbf24; font-size: 14px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 8px; text-transform: uppercase; }
+.notice-body { color: #f8fafc; font-size: 16px; line-height: 1.6; white-space: pre-line; }
 .trip-card { background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid #3b82f6; border-radius: 14px; padding: 20px; margin-bottom: 12px; }
 .vote-badge { display: inline-block; background-color: #064e3b; color: #34d399; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
 .member-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
@@ -117,7 +121,6 @@ if st.session_state.user is None:
                             st.rerun()
 
     st.stop()
-
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
 
@@ -142,7 +145,7 @@ if st.session_state.selected_trip is None or st.session_state.selected_trip not 
         with st.expander("➕ Tạo Chuyến Đi Mới", expanded=False):
             with st.form("create_trip_form", clear_on_submit=True):
                 new_trip_name = st.text_input("Tên chuyến đi mới", placeholder="Ví dụ: Chuyến đi chơi 2 - Vũng Tàu...")
-                new_trip_desc = st.text_input("Mô tả / Thời gian dự kiến", placeholder="Ví dụ: Đi 2 ngày 1 đêm cuối tháng...")
+                new_trip_desc = st.text_area("Mô tả / Thời gian dự kiến", placeholder="Ví dụ: Đi 2 ngày 1 đêm cuối tháng...")
                 if st.form_submit_button("➕ Tạo Chuyến Đi", use_container_width=True):
                     t_clean = new_trip_name.strip()
                     if not t_clean:
@@ -170,7 +173,8 @@ if st.session_state.selected_trip is None or st.session_state.selected_trip not 
             t_info = db["trips"][t_name]
             n_locs = len(t_info.get("locations", []))
             n_reqs = len(t_info.get("requirements", []))
-            card_t = f'<div class="trip-card"><h3 style="margin:0 0 6px 0; color:#38bdf8;">⛺ {t_name}</h3><p style="margin:0 0 10px 0; color:#cbd5e1; font-size:14px;">{t_info.get("desc", "")}</p><span class="vote-badge">📍 {n_locs} địa điểm &nbsp;|&nbsp; 🎒 {n_reqs} món đồ</span></div>'
+            safe_preview = html.escape(t_info.get("desc", ""))
+            card_t = f'<div class="trip-card"><h3 style="margin:0 0 6px 0; color:#38bdf8;">⛺ {html.escape(t_name)}</h3><p style="margin:0 0 10px 0; color:#cbd5e1; font-size:14px; white-space: pre-line;">{safe_preview}</p><span class="vote-badge">📍 {n_locs} địa điểm &nbsp;|&nbsp; 🎒 {n_reqs} món đồ</span></div>'
             st.markdown(card_t, unsafe_allow_html=True)
 
             if is_admin and len(trip_names) > 1:
@@ -194,6 +198,7 @@ if st.session_state.selected_trip is None or st.session_state.selected_trip not 
             st.markdown("<br>", unsafe_allow_html=True)
 
     st.stop()
+
 cur_trip = st.session_state.selected_trip
 trip_data = db["trips"][cur_trip]
 
@@ -201,9 +206,26 @@ if st.button("⬅️ Quay lại danh sách chuyến đi", use_container_width=Tr
     st.session_state.selected_trip = None
     st.rerun()
 
-MAIN_HTML = f'<div class="hero-banner"><h2 style="margin:0;">⛺ {cur_trip.upper()}</h2><p style="margin:8px 0 0 0; font-size:15px;">{trip_data.get("desc", "")}</p></div>'
+MAIN_HTML = f'<div class="hero-banner" style="padding: 18px 22px;"><h2 style="margin:0;">⛺ {html.escape(cur_trip.upper())}</h2></div>'
 st.markdown(MAIN_HTML, unsafe_allow_html=True)
 
+raw_desc = trip_data.get("desc", "").strip() or "Chưa có thông tin chi tiết cho chuyến đi này."
+safe_desc = html.escape(raw_desc)
+NOTICE_HTML = f'<div class="notice-board"><div class="notice-title">📢 THÔNG TIN & MÔ TẢ CHUYẾN ĐI</div><div class="notice-body">{safe_desc}</div></div>'
+st.markdown(NOTICE_HTML, unsafe_allow_html=True)
+
+if is_admin:
+    with st.expander("✏️ Chỉnh sửa thông tin / mô tả chuyến đi", expanded=False):
+        with st.form("edit_trip_desc_form"):
+            updated_desc = st.text_area("Nội dung thông báo / lịch trình", value=trip_data.get("desc", ""), height=130)
+            if st.form_submit_button("💾 Lưu mô tả", use_container_width=True):
+                load_cloud.clear()
+                current_db = load_cloud()
+                if cur_trip in current_db["trips"]:
+                    current_db["trips"][cur_trip]["desc"] = updated_desc.strip()
+                    if save_cloud(current_db):
+                        st.success("Đã cập nhật thông tin chuyến đi!")
+                        st.rerun()
 t_loc, t_req, t_mem = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên"])
 
 with t_loc:
