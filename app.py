@@ -61,12 +61,12 @@ def add_log(data_dict: dict, msg: str, is_important: bool = False):
     plain_msg = msg.replace("**", "").replace("*", "")
     send_external_push(data_dict, plain_msg)
 
-def trigger_browser_push(notif_item: dict):
-    if not notif_item:
+def trigger_browser_push(notif_item):
+    if isinstance(notif_item, list):
+        notif_item = notif_item if notif_item else None
+    if not isinstance(notif_item, dict):
         return
-    nid = notif_item.get("id", "")
-    if st.session_state.get("last_pushed_id") == nid:
-        return
+
     st.session_state.last_pushed_id = nid
     safe_text = notif_item.get("msg", "").replace('"', '\\"').replace("\n", " ").replace("**", "")
     js_code = f"""
