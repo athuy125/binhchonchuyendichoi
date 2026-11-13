@@ -256,21 +256,16 @@ with col_c:
         st.rerun()
 
 with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đội", expanded=True):
-    components.html(
+        components.html(
         """
-        <div style="display:flex; gap:8px; align-items:center;">
-            <button onclick="Notification.requestPermission().then(p => alert(p === 'granted' ? 'Đã bật thông báo trên trình duyệt thành công!' : 'Trình duyệt đang chặn thông báo, hãy bật trong cài đặt trang web.'))"
-            style="background:#2563eb; color:white; border:none; padding:6px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px;">
-            📲 Bật thông báo trình duyệt
-            </button>
-            <span style="color:#94a3b8; font-size:12px;">(Tự động cập nhật mỗi 25s)</span>
-        </div>
-        <script>
-        setTimeout(function(){ window.parent.location.reload(); }, 25000);
-        </script>
+        <button onclick="Notification.requestPermission().then(p => alert(p === 'granted' ? 'Đã bật thông báo trên trình duyệt thành công!' : 'Trình duyệt đang chặn thông báo, hãy bật trong cài đặt trang web.'))"
+        style="background:#2563eb; color:white; border:none; padding:6px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px;">
+        📲 Bật thông báo trình duyệt
+        </button>
         """,
         height=38,
     )
+
 
     if is_admin:
         with st.form("admin_broadcast_form", clear_on_submit=True):
