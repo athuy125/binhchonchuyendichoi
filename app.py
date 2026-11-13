@@ -1,6 +1,7 @@
 import datetime
 import hashlib
 import html
+import secrets
 import requests
 import streamlit as st
 import streamlit.components.v1 as components
@@ -34,12 +35,31 @@ def now_vn() -> datetime.datetime:
 def make_hash(text: str) -> str:
     return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
+def send_external_push(data_dict: dict, clean_msg: str):
+    cfg = data_dict.get("config", {})
+    discord_url = cfg.get("discord_webhook", "").strip()
+    tg_token = cfg.get("tg_token", "").strip()
+    tg_chat = cfg.get("tg_chat_id", "").strip()
+    if discord_url:
+        try:
+            requests.post(discord_url, json={"content": f"⛺ **THÔNG BÁO ĐỘI:** {clean_msg}"}, timeout=4)
+        except Exception:
+            pass
+    if tg_token and tg_chat:
+        try:
+            tg_api = f"https://telegram.org{tg_token}/sendMessage"
+            requests.post(tg_api, json={"chat_id": tg_chat, "text": f"⛺ THÔNG BÁO ĐỘI:\n{clean_msg}"}, timeout=4)
+        except Exception:
+            pass
+
 def add_log(data_dict: dict, msg: str, is_important: bool = False):
     logs = data_dict.get("notifications", [])
     ts = now_vn().strftime("%H:%M %d/%m/%Y")
     item_id = f"{now_vn().timestamp()}_{len(logs)}"
     logs.insert(0, {"id": item_id, "time": ts, "msg": msg, "important": is_important})
     data_dict["notifications"] = logs[:40]
+    plain_msg = msg.replace("**", "").replace("*", "")
+    send_external_push(data_dict, plain_msg)
 
 def trigger_browser_push(notif_item: dict):
     if not notif_item:
@@ -48,7 +68,7 @@ def trigger_browser_push(notif_item: dict):
     if st.session_state.get("last_pushed_id") == nid:
         return
     st.session_state.last_pushed_id = nid
-    safe_text = notif_item.get("msg", "").replace('"', '\\"').replace("\n", " ")
+    safe_text = notif_item.get("msg", "").replace('"', '\\"').replace("\n", " ").replace("**", "")
     js_code = f"""
     <script>
     if ("Notification" in window) {{
@@ -68,7 +88,7 @@ def trigger_browser_push(notif_item: dict):
 
 @st.cache_data(ttl=10, show_spinner=False)
 def load_cloud() -> dict:
-    default = {"users": {}, "trips": {}, "notifications": []}
+    default = {"users": {}, "sessions": {}, "trips": {}, "notifications": [], "config": {}}
     try:
         latest_url = "/".join([API_URL, "latest"])
         r = requests.get(latest_url, headers=HEADERS, timeout=10)
@@ -77,7 +97,9 @@ def load_cloud() -> dict:
             record = res_json.get("record", res_json)
             if isinstance(record, dict):
                 default["users"] = record.get("users", {})
+                default["sessions"] = record.get("sessions", {})
                 default["notifications"] = record.get("notifications", [])
+                default["config"] = record.get("config", {})
                 trips = record.get("trips", {})
                 if not trips:
                     old_locs = record.get("locations", [])
@@ -114,6 +136,14 @@ if "selected_trip" not in st.session_state:
     st.session_state.selected_trip = None
 
 db = load_cloud()
+
+if st.session_state.user is None:
+    saved_token = st.query_params.get("token", "")
+    if saved_token and saved_token in db.get("sessions", {}):
+        auto_user = db["sessions"][saved_token]
+        if auto_user in db.get("users", {}):
+            st.session_state.user = auto_user
+            st.rerun()
 if st.session_state.user is None:
     AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
     st.markdown(AUTH_HTML, unsafe_allow_html=True)
@@ -123,6 +153,7 @@ if st.session_state.user is None:
         with st.form("login_box"):
             name = st.text_input("Tên của bạn", placeholder="Nhập tên đã đăng ký...").strip()
             pwd = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
+            remember_in = st.checkbox("💾 Ghi nhớ đăng nhập trên thiết bị này", value=True)
             if st.form_submit_button("🚀 Vào Hệ Thống", use_container_width=True):
                 if not name or not pwd:
                     st.warning("Vui lòng nhập đủ tên và mật khẩu!")
@@ -134,6 +165,11 @@ if st.session_state.user is None:
                     elif fresh_db["users"][name] != make_hash(pwd):
                         st.error("Mật khẩu không đúng!")
                     else:
+                        if remember_in:
+                            new_tk = secrets.token_hex(12)
+                            fresh_db.setdefault("sessions", {})[new_tk] = name
+                            save_cloud(fresh_db)
+                            st.query_params["token"] = new_tk
                         st.session_state.user = name
                         st.rerun()
 
@@ -142,6 +178,7 @@ if st.session_state.user is None:
             r_name = st.text_input("Tên hiển thị của bạn", placeholder="Ví dụ: Huy Đỗ...").strip()
             r_pwd = st.text_input("Tạo mật khẩu", type="password")
             r_pwd2 = st.text_input("Nhập lại mật khẩu", type="password")
+            remember_up = st.checkbox("💾 Ghi nhớ đăng nhập sau khi đăng ký", value=True)
             if st.form_submit_button("✅ Đăng Ký & Lưu Online", use_container_width=True):
                 if not r_name or not r_pwd:
                     st.warning("Không được để trống tên hoặc mật khẩu!")
@@ -154,6 +191,10 @@ if st.session_state.user is None:
                         st.error("Tên này đã có người đăng ký rồi!")
                     else:
                         fresh_db["users"][r_name] = make_hash(r_pwd)
+                        if remember_up:
+                            new_tk = secrets.token_hex(12)
+                            fresh_db.setdefault("sessions", {})[new_tk] = r_name
+                            st.query_params["token"] = new_tk
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.session_state.user = r_name
@@ -190,8 +231,7 @@ if need_deadline_save:
 
 all_notifs = db.get("notifications", [])
 if all_notifs:
-    trigger_browser_push(all_notifs[0])
-
+    trigger_browser_push(all_notifs)
 
 col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
 with col_a:
@@ -202,6 +242,14 @@ with col_b:
         st.rerun()
 with col_c:
     if st.button("Thoát", use_container_width=True):
+        cur_tk = st.query_params.get("token", "")
+        if cur_tk:
+            load_cloud.clear()
+            clean_db = load_cloud()
+            if cur_tk in clean_db.get("sessions", {}):
+                del clean_db["sessions"][cur_tk]
+                save_cloud(clean_db)
+            st.query_params.clear()
         st.session_state.user = None
         st.session_state.selected_trip = None
         st.rerun()
@@ -209,10 +257,16 @@ with col_c:
 with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đội", expanded=True):
     components.html(
         """
-        <button onclick="Notification.requestPermission().then(p => alert(p === 'granted' ? 'Đã bật thông báo về máy thành công!' : 'Trình duyệt đang chặn thông báo, hãy bật trong cài đặt trang web.'))"
-        style="background:#2563eb; color:white; border:none; padding:6px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px;">
-        📲 Bật thông báo đẩy về máy này
-        </button>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <button onclick="Notification.requestPermission().then(p => alert(p === 'granted' ? 'Đã bật thông báo trên trình duyệt thành công!' : 'Trình duyệt đang chặn thông báo, hãy bật trong cài đặt trang web.'))"
+            style="background:#2563eb; color:white; border:none; padding:6px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px;">
+            📲 Bật thông báo trình duyệt
+            </button>
+            <span style="color:#94a3b8; font-size:12px;">(Tự động cập nhật mỗi 25s)</span>
+        </div>
+        <script>
+        setTimeout(function(){ window.parent.location.reload(); }, 25000);
+        </script>
         """,
         height=38,
     )
@@ -230,6 +284,24 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
                         st.rerun()
                 else:
                     st.warning("Vui lòng nhập nội dung thông báo!")
+
+        with st.expander("⚙️ Cài đặt gửi thông báo về điện thoại (Khi tắt web)", expanded=False):
+            with st.form("webhook_cfg_form"):
+                cur_cfg = db.get("config", {})
+                in_discord = st.text_input("Link Discord Webhook nhóm đội (Tùy chọn)", value=cur_cfg.get("discord_webhook", ""), placeholder="https://discord.com...")
+                in_tg_tk = st.text_input("Telegram Bot Token (Tùy chọn)", value=cur_cfg.get("tg_token", ""), placeholder="123456:ABC-DEF...")
+                in_tg_id = st.text_input("Telegram Chat ID nhóm đội (Tùy chọn)", value=cur_cfg.get("tg_chat_id", ""), placeholder="-100123456789")
+                if st.form_submit_button("💾 Lưu cấu hình thông báo ngoài web", use_container_width=True):
+                    load_cloud.clear()
+                    current_db = load_cloud()
+                    current_db["config"] = {
+                        "discord_webhook": in_discord.strip(),
+                        "tg_token": in_tg_tk.strip(),
+                        "tg_chat_id": in_tg_id.strip(),
+                    }
+                    if save_cloud(current_db):
+                        st.success("Đã lưu cấu hình thông báo tự động!")
+                        st.rerun()
 
     if not all_notifs:
         st.caption("Chưa có hoạt động nào được ghi nhận.")
@@ -259,8 +331,6 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
                 current_db["notifications"] = []
                 if save_cloud(current_db):
                     st.rerun()
-
-            st.markdown(f"- `[{n_item.get('time', '')}]` {n_item.get('msg', '')}")
 if st.session_state.selected_trip is None or st.session_state.selected_trip not in db["trips"]:
     LOBBY_HTML = '<div class="hero-banner"><h2 style="margin:0;">🗺️ DANH SÁCH CHUYẾN ĐI CỦA ĐỘI</h2><p style="margin:8px 0 0 0; font-size:15px;">Chọn một chuyến đi bên dưới để xem chi tiết, bình chọn địa điểm và phân công đồ dùng.</p></div>'
     st.markdown(LOBBY_HTML, unsafe_allow_html=True)
