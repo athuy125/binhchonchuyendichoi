@@ -234,7 +234,32 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
     if not all_notifs:
         st.caption("Chưa có hoạt động nào được ghi nhận.")
     else:
-        for n_item in all_notifs[:6]:
+        for idx_n, n_item in enumerate(all_notifs[:6]):
+            if is_admin:
+                col_n1, col_n2 = st.columns([5.2, 0.8])
+                with col_n1:
+                    st.markdown(f"- `[{n_item.get('time', '')}]` {n_item.get('msg', '')}")
+                with col_n2:
+                    if st.button("🗑️", key=f"del_notif_{idx_n}", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        cur_list = current_db.get("notifications", [])
+                        if idx_n < len(cur_list):
+                            cur_list.pop(idx_n)
+                            current_db["notifications"] = cur_list
+                            if save_cloud(current_db):
+                                st.rerun()
+            else:
+                st.markdown(f"- `[{n_item.get('time', '')}]` {n_item.get('msg', '')}")
+
+        if is_admin:
+            if st.button("🧹 Xóa tất cả thông báo", key="clear_all_notifs", use_container_width=True):
+                load_cloud.clear()
+                current_db = load_cloud()
+                current_db["notifications"] = []
+                if save_cloud(current_db):
+                    st.rerun()
+
             st.markdown(f"- `[{n_item.get('time', '')}]` {n_item.get('msg', '')}")
 if st.session_state.selected_trip is None or st.session_state.selected_trip not in db["trips"]:
     LOBBY_HTML = '<div class="hero-banner"><h2 style="margin:0;">🗺️ DANH SÁCH CHUYẾN ĐI CỦA ĐỘI</h2><p style="margin:8px 0 0 0; font-size:15px;">Chọn một chuyến đi bên dưới để xem chi tiết, bình chọn địa điểm và phân công đồ dùng.</p></div>'
