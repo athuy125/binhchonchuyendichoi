@@ -842,6 +842,7 @@ with t_food:
         horizontal=True,
         label_visibility="collapsed",
     )
+
     foods = trip_data.get("foods", [])
     if not isinstance(foods, list) or len(foods) == 0:
         st.info("Thực đơn chưa có món nào. Hãy bấm nút '➕ Thêm Món Ăn / Thức Uống Mới' ở trên để thêm món đầu tiên!")
@@ -895,6 +896,7 @@ with t_food:
                             """,
                             unsafe_allow_html=True,
                         )
+
                         b1, b2 = st.columns([3.8, 1])
                         with b1:
                             btn_txt = "✅ ĐÃ CHỌN (Bỏ)" if is_voted else "👍 CHỌN MÓN"
@@ -913,7 +915,7 @@ with t_food:
                                     cur_foods[idx_f]["voters"] = v_list
                                     if save_cloud(current_db):
                                         st.rerun()
-                         with b2:
+                        with b2:
                             if st.button("🗑️", key=f"grid_del_food_{cur_trip}_{idx_f}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
@@ -943,6 +945,8 @@ with t_food:
                                                 cur_foods[idx_f]["img"] = ef_img.strip()
                                             if save_cloud(current_db):
                                                 st.rerun()
+
+
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
