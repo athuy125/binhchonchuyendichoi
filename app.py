@@ -1035,7 +1035,25 @@ with t_req:
                                             st.rerun()
 
                         # Khung gắn hình ảnh & chỉnh sửa cho tất cả các mục cũ lẫn mới
-                        with st.expander("🖼️ Gắn ảnh / Sửa mục 
+                                                with st.expander("🖼️ Gắn ảnh / Sửa mục"):
+                            with st.form(f"edit_req_{cur_trip}_{i}"):
+                                er_task = st.text_input("Tên đồ dùng", value=req.get("task", ""))
+                                er_note = st.text_input("SL / Ghi chú", value=req.get("qty_note", ""))
+                                er_img = st.text_input("Link ảnh (https://...)", value=req.get("img", ""))
+                                if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
+                                    load_cloud.clear()
+                                    current_db = load_cloud()
+                                    t_reqs = current_db["trips"][cur_trip]["requirements"]
+                                    if i < len(t_reqs):
+                                        if er_task.strip():
+                                            t_reqs[i]["task"] = er_task.strip()
+                                        t_reqs[i]["qty_note"] = er_note.strip()
+                                        if er_img.strip().startswith("http"):
+                                            t_reqs[i]["img"] = er_img.strip()
+                                        add_log(current_db, f"🖼️ **{me}** đã cập nhật **{t_reqs[i]['task']}**.")
+                                        if save_cloud(current_db):
+                                            st.rerun()
+
 with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
