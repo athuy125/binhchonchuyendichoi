@@ -913,7 +913,7 @@ with t_food:
                                     cur_foods[idx_f]["voters"] = v_list
                                     if save_cloud(current_db):
                                         st.rerun()
-                        with b2:
+                         with b2:
                             if st.button("🗑️", key=f"grid_del_food_{cur_trip}_{idx_f}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
@@ -946,9 +946,6 @@ with t_food:
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
-
-
-                        st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_req:
     can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
     reqs = trip_data.get("requirements", [])
