@@ -317,7 +317,10 @@ with col_c:
             if cur_session_tk in clean_db.get("sessions", {}):
                 del clean_db["sessions"][cur_session_tk]
                 save_cloud(clean_db)
-            cookie_manager.delete("team_trip_session_v4")
+            try:
+                cookie_manager.delete("team_trip_session_v4")
+            except Exception:
+                pass
             time.sleep(0.5)
         st.query_params.clear()
         st.session_state.active_token = ""
@@ -325,6 +328,7 @@ with col_c:
         st.session_state.user = None
         st.session_state.selected_trip = None
         st.rerun()
+
 with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đội", expanded=True):
     top_n1, top_n2 = st.columns([3.2, 2.2])
     with top_n1:
