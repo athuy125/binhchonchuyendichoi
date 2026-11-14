@@ -167,7 +167,7 @@ def save_cloud(data: dict) -> bool:
         st.error(f"Lỗi mạng: {e}")
         return False
 
-cookie_manager = stx.CookieManager(key="team_auth_cookie_grid")
+cookie_manager = stx.CookieManager(key="team_auth_cookie_v18")
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -180,7 +180,7 @@ db = load_cloud()
 
 if st.session_state.user is None:
     url_tk = st.query_params.get("token", "")
-    ck_tk = cookie_manager.get("team_trip_session_grid")
+    ck_tk = cookie_manager.get("team_trip_session_v18")
     found_tk = ck_tk or url_tk
 
     if found_tk and found_tk in db.get("sessions", {}):
@@ -192,7 +192,7 @@ if st.session_state.user is None:
                 st.query_params["token"] = found_tk
             if not ck_tk:
                 exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-                cookie_manager.set("team_trip_session_grid", found_tk, expires_at=exp_d)
+                cookie_manager.set("team_trip_session_v18", found_tk, expires_at=exp_d)
             st.rerun()
 if st.session_state.user is None:
     AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
@@ -219,7 +219,7 @@ if st.session_state.user is None:
                         fresh_db.setdefault("sessions", {})[new_tk] = name
                         save_cloud(fresh_db)
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_grid", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_v18", new_tk, expires_at=exp_date)
                         st.query_params["token"] = new_tk
                         st.session_state.active_token = new_tk
                         st.session_state.user = name
@@ -247,7 +247,7 @@ if st.session_state.user is None:
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = r_name
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_grid", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_v18", new_tk, expires_at=exp_date)
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.query_params["token"] = new_tk
@@ -261,13 +261,13 @@ if st.session_state.user is None:
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
 
-cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_grid")
+cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_v18")
 if cur_session_tk:
     if st.query_params.get("token", "") != cur_session_tk:
         st.query_params["token"] = cur_session_tk
     if not st.session_state.get("cookie_refreshed"):
         exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-        cookie_manager.set("team_trip_session_grid", cur_session_tk, expires_at=exp_d)
+        cookie_manager.set("team_trip_session_v18", cur_session_tk, expires_at=exp_d)
         st.session_state.cookie_refreshed = True
 
 need_deadline_save = False
@@ -313,7 +313,7 @@ with col_c:
                 del clean_db["sessions"][cur_session_tk]
                 save_cloud(clean_db)
             try:
-                cookie_manager.delete("team_trip_session_grid")
+                cookie_manager.delete("team_trip_session_v18")
             except Exception:
                 pass
             time.sleep(0.5)
@@ -410,12 +410,17 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
                 current_db["notifications"] = []
                 if save_cloud(current_db):
                     st.rerun()
-DEFAULT_TRIP_IMG = "https://unsplash.com"
-DEFAULT_LOC_IMG = "https://unsplash.com"
+DEFAULT_TRIP_IMG = "https://pexels.com"
+DEFAULT_LOC_IMG = "https://pexels.com"
+DEFAULT_FOOD_IMGS = {
+    "🍖 Món chính": "https://pexels.com",
+    "🥤 Thức uống": "https://pexels.com",
+    "🍰 Tráng miệng": "https://pexels.com",
+}
 DEFAULT_REQ_IMGS = {
-    "📦 Nhu Yếu Phẩm & Vật Dụng": "https://unsplash.com",
-    "🍖 Thức Ăn & Nước Uống": "https://unsplash.com",
-    "🍳 Dụng Cụ Nấu Ăn & Khác": "https://unsplash.com",
+    "📦 Nhu Yếu Phẩm & Vật Dụng": "https://pexels.com",
+    "🍖 Thức Ăn & Nước Uống": "https://pexels.com",
+    "🍳 Dụng Cụ Nấu Ăn & Khác": "https://pexels.com",
 }
 
 if st.session_state.selected_trip is None or st.session_state.selected_trip not in db["trips"]:
@@ -471,7 +476,7 @@ if st.session_state.selected_trip is None or st.session_state.selected_trip not 
                 n_foods = len(t_info.get("foods", []))
                 n_reqs = len(t_info.get("requirements", []))
                 t_cover = str(t_info.get("img", "")).strip()
-                if not t_cover.startswith("http"):
+                if not t_cover.startswith("http") or "unsplash.com" in t_cover:
                     t_cover = DEFAULT_TRIP_IMG
 
                 with t_cols[off_t]:
@@ -479,7 +484,7 @@ if st.session_state.selected_trip is None or st.session_state.selected_trip not 
                         f"""
                         <div style="background:#131b2e; border:2px solid #3b82f6; border-radius:14px; overflow:hidden; margin-bottom:8px;">
                             <div style="position:relative; width:100%; height:155px; background:#090d16;">
-                                <img src="{html.escape(t_cover)}" style="width:100%; height:155px; object-fit:cover; display:block;" />
+                                <img src="{html.escape(t_cover)}" onerror="this.onerror=null;this.src='{DEFAULT_TRIP_IMG}';" style="width:100%; height:155px; object-fit:cover; display:block;" />
                                 <span style="position:absolute; bottom:8px; left:8px; background:rgba(6,78,59,0.92); color:#6ee7b7 !important; padding:3px 10px; border-radius:10px; font-size:12px; font-weight:700; border:1px solid #10b981;">📍 {n_locs} điểm | 🍽️ {n_foods} món | 🎒 {n_reqs} đồ</span>
                             </div>
                             <div style="padding:12px; text-align:center;">
@@ -621,7 +626,7 @@ with t_loc:
                             st.rerun()
                     else:
                         st.warning("Vui lòng nhập tên địa điểm!")
-        locs = trip_data.get("locations", [])
+    locs = trip_data.get("locations", [])
     if len(locs) == 0:
         st.info("Chưa có địa điểm nào được đề xuất cho chuyến đi này.")
     else:
@@ -635,7 +640,7 @@ with t_loc:
                 voters = loc.get("voters", [])
                 voted = me in voters
                 loc_img_url = str(loc.get("img", "")).strip()
-                if not loc_img_url.startswith("http"):
+                if not loc_img_url.startswith("http") or "unsplash.com" in loc_img_url:
                     loc_img_url = DEFAULT_LOC_IMG
 
                 card_border = "#10b981" if voted else "#334155"
@@ -692,11 +697,11 @@ with t_loc:
                                 if save_cloud(current_db):
                                     st.rerun()
 
-                    with st.expander("🖼️ Đổi ảnh / Sửa địa điểm này", expanded=False):
-                        with st.form(f"edit_loc_form_{cur_trip}_{i}"):
+                    with st.expander("🖼️ Đổi ảnh / Sửa điểm"):
+                        with st.form(f"edit_loc_{cur_trip}_{i}"):
                             el_name = st.text_input("Tên địa điểm", value=loc.get("name", ""))
                             el_desc = st.text_input("Mô tả", value=loc.get("desc", ""))
-                            el_img = st.text_input("Dán link hình ảnh mới", value=loc.get("img", ""), placeholder="https://...")
+                            el_img = st.text_input("Link ảnh mới (https://...)", value=loc.get("img", ""))
                             if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
@@ -705,19 +710,13 @@ with t_loc:
                                     if el_name.strip():
                                         t_locs[i]["name"] = el_name.strip()
                                     t_locs[i]["desc"] = el_desc.strip()
-                                    t_locs[i]["img"] = el_img.strip() if el_img.strip().startswith("http") else DEFAULT_LOC_IMG
+                                    if el_img.strip().startswith("http"):
+                                        t_locs[i]["img"] = el_img.strip()
                                     if save_cloud(current_db):
                                         st.rerun()
 
                     st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
-
 with t_food:
-    DEFAULT_FOOD_IMGS = {
-        "🍖 Món chính": "https://unsplash.com",
-        "🥤 Thức uống": "https://unsplash.com",
-        "🍰 Tráng miệng": "https://unsplash.com",
-    }
-
     st.markdown(
         """
         <div style="background:linear-gradient(90deg, #92400e, #1e293b); border:2px solid #f59e0b; border-radius:14px; padding:14px 18px; margin-bottom:14px;">
@@ -793,9 +792,10 @@ with t_food:
                     f_voters = f_item.get("voters", [])
                     is_voted = (me in f_voters)
                     f_type = f_item.get("type", "🍖 Món chính")
+                    fallback_f_img = DEFAULT_FOOD_IMGS.get(f_type, DEFAULT_FOOD_IMGS["🍖 Món chính"])
                     img_url = str(f_item.get("img", "")).strip()
-                    if not img_url.startswith("http"):
-                        img_url = DEFAULT_FOOD_IMGS.get(f_type, DEFAULT_FOOD_IMGS["🍖 Món chính"])
+                    if not img_url.startswith("http") or "unsplash.com" in img_url:
+                        img_url = fallback_f_img
 
                     card_border = "#10b981" if is_voted else "#334155"
                     voters_str = ", ".join(f_voters) if f_voters else "Chưa ai chọn"
@@ -805,7 +805,7 @@ with t_food:
                             f"""
                             <div style="background:#131b2e; border:2px solid {card_border}; border-radius:14px; overflow:hidden; margin-bottom:8px;">
                                 <div style="position:relative; width:100%; height:165px; background:#090d16;">
-                                    <img src="{html.escape(img_url)}" style="width:100%; height:165px; object-fit:cover; display:block;" />
+                                    <img src="{html.escape(img_url)}" onerror="this.onerror=null;this.src='{fallback_f_img}';" style="width:100%; height:165px; object-fit:cover; display:block;" />
                                     <span style="position:absolute; top:8px; left:8px; background:rgba(15,23,42,0.88); color:#fbbf24 !important; padding:3px 9px; border-radius:8px; font-size:11.5px; font-weight:700; border:1px solid #f59e0b;">{html.escape(f_type)}</span>
                                     <span style="position:absolute; top:8px; right:8px; background:#064e3b; color:#6ee7b7 !important; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:800; border:1px solid #10b981;">🔥 {len(f_voters)} chọn</span>
                                 </div>
@@ -818,7 +818,6 @@ with t_food:
                             """,
                             unsafe_allow_html=True,
                         )
-
                         b1, b2 = st.columns([3.8, 1])
                         with b1:
                             btn_txt = "✅ ĐÃ CHỌN (Bỏ)" if is_voted else "👍 CHỌN MÓN"
@@ -848,6 +847,24 @@ with t_food:
                                     add_log(current_db, f"🗑️ **{me}** đã xóa món **{del_fn}** (*{cur_trip}*).")
                                     if save_cloud(current_db):
                                         st.rerun()
+
+                        with st.expander("🖼️ Đổi ảnh / Sửa món"):
+                            with st.form(f"edit_food_{cur_trip}_{idx_f}"):
+                                ef_name = st.text_input("Tên món", value=f_item.get("name", ""))
+                                ef_note = st.text_input("Giá / Ghi chú", value=f_item.get("note", ""))
+                                ef_img = st.text_input("Link ảnh mới (https://...)", value=f_item.get("img", ""))
+                                if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
+                                    load_cloud.clear()
+                                    current_db = load_cloud()
+                                    cur_foods = current_db["trips"][cur_trip].get("foods", [])
+                                    if idx_f < len(cur_foods):
+                                        if ef_name.strip():
+                                            cur_foods[idx_f]["name"] = ef_name.strip()
+                                        cur_foods[idx_f]["note"] = ef_note.strip()
+                                        if ef_img.strip().startswith("http"):
+                                            cur_foods[idx_f]["img"] = ef_img.strip()
+                                        if save_cloud(current_db):
+                                            st.rerun()
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_req:
@@ -909,12 +926,6 @@ with t_req:
                         st.rerun()
                 else:
                     st.warning("Vui lòng nhập tên vật dụng!")
-        SAFE_REQ_IMGS = {
-        "📦 Nhu Yếu Phẩm & Vật Dụng": "https://pexels.com",
-        "🍖 Thức Ăn & Nước Uống": "https://pexels.com",
-        "🍳 Dụng Cụ Nấu Ăn & Khác": "https://pexels.com",
-    }
-
     req_filter = st.radio(
         "Lọc đồ dùng:",
         ["📋 Tất cả đồ dùng", "📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"],
@@ -945,7 +956,7 @@ with t_req:
                     req = reqs[i]
                     is_done = bool(req.get("done", False))
                     r_cat = req.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng")
-                    fallback_img = SAFE_REQ_IMGS.get(r_cat, SAFE_REQ_IMGS["📦 Nhu Yếu Phẩm & Vật Dụng"])
+                    fallback_img = DEFAULT_REQ_IMGS.get(r_cat, DEFAULT_REQ_IMGS["📦 Nhu Yếu Phẩm & Vật Dụng"])
                     r_img = str(req.get("img", "")).strip()
                     if not r_img.startswith("http") or "unsplash.com" in r_img:
                         r_img = fallback_img
@@ -977,7 +988,6 @@ with t_req:
                             """,
                             unsafe_allow_html=True,
                         )
-
                         if can_manage_req:
                             rb1, rb2, rb3 = st.columns([2.8, 1, 1])
                         else:
@@ -1033,9 +1043,7 @@ with t_req:
                                         add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_t}** (*{cur_trip}*).")
                                         if save_cloud(current_db):
                                             st.rerun()
-
-                        # Khung gắn hình ảnh & chỉnh sửa cho tất cả các mục cũ lẫn mới
-                                                with st.expander("🖼️ Gắn ảnh / Sửa mục"):
+                        with st.expander("🖼️ Gắn ảnh / Sửa mục"):
                             with st.form(f"edit_req_{cur_trip}_{i}"):
                                 er_task = st.text_input("Tên đồ dùng", value=req.get("task", ""))
                                 er_note = st.text_input("SL / Ghi chú", value=req.get("qty_note", ""))
@@ -1054,6 +1062,7 @@ with t_req:
                                         if save_cloud(current_db):
                                             st.rerun()
 
+                        st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
