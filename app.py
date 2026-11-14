@@ -50,18 +50,11 @@ div.stButton > button {
     border: 1px solid #3b82f6 !important;
     border-radius: 8px !important;
     font-weight: 600 !important;
-    padding: 4px 8px !important;
 }
-div.stButton > button {
-    background-color: #1e293b !important;
+div.stButton > button:hover {
+    background-color: #2563eb !important;
     color: #ffffff !important;
-    border: 1px solid #3b82f6 !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    padding: 4px 10px !important;
-    white-space: nowrap !important;
 }
-
 button[kind="primaryFormSubmit"], [data-testid="stFormSubmitButton"] > button {
     background: linear-gradient(135deg, #059669 0%, #2563eb 100%) !important;
     color: #ffffff !important;
@@ -76,19 +69,45 @@ button[kind="primaryFormSubmit"], [data-testid="stFormSubmitButton"] > button {
 .member-card { background-color: #161f33; border: 1px solid #334155; border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
 .notif-row { background-color: #131b2e; border: 1px solid #263248; border-left: 4px solid #38bdf8; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
 .notif-row-vip { background-color: #1c1917; border: 1px solid #f59e0b; border-left: 4px solid #f59e0b; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
-.grid-title { background: linear-gradient(90deg, #1e3a8a, #0f172a); border: 1px solid #3b82f6; border-radius: 10px 10px 0 0; padding: 10px 14px; font-weight: 800; color: #93c5fd !important; font-size: 15px; margin-top: 16px; }
-.grid-head { background-color: #1e293b; border-left: 1px solid #334155; border-right: 1px solid #334155; border-bottom: 1px solid #334155; padding: 6px 10px; font-size: 12px; font-weight: 700; color: #94a3b8 !important; text-transform: uppercase; }
-.grid-cell { padding: 6px 4px; font-size: 13.5px; color: #ffffff !important; border-bottom: 1px solid #1e293b; }
 </style>
 """
-st.markdown(CSS_STYLE,         unsafe_allow_html=True,
-    )
+st.markdown(CSS_STYLE, unsafe_allow_html=True)
+def now_vn() -> datetime.datetime:
+    return datetime.datetime.utcnow() + datetime.timedelta(hours=7)
 
-    can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
-    reqs = trip_data.get("requirements", [])
-    if not isinstance(reqs, list):
-        reqs = []
+def make_hash(text: str) -> str:
+    return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
+def send_external_push(data_dict: dict, clean_msg: str):
+    cfg = data_dict.get("config", {})
+    discord_url = cfg.get("discord_webhook", "").strip()
+    tg_token = cfg.get("tg_token", "").strip()
+    tg_chat = cfg.get("tg_chat_id", "").strip()
+    if discord_url:
+        try:
+            requests.post(discord_url, json={"content": f"⛺ **THÔNG BÁO ĐỘI:** {clean_msg}"}, timeout=4)
+        except Exception:
+            pass
+    if tg_token and tg_chat:
+        try:
+            tg_api = f"https://telegram.org{tg_token}/sendMessage"
+            requests.post(tg_api, json={"chat_id": tg_chat, "text": f"⛺ THÔNG BÁO ĐỘI:\n{clean_msg}"}, timeout=4)
+        except Exception:
+            pass
+
+def add_log(data_dict: dict, msg: str, is_important: bool = False):
+    logs = data_dict.get("notifications", [])
+    ts = now_vn().strftime("%H:%M %d/%m/%Y")
+    item_id = f"{now_vn().timestamp()}_{len(logs)}"
+    logs.insert(0, {"id": item_id, "time": ts, "msg": msg, "important": is_important})
+    data_dict["notifications"] = logs[:40]
+    plain_msg = msg.replace("**", "").replace("*", "")
+    send_external_push(data_dict, plain_msg)
+
+def trigger_browser_push(notif_item):
+    if isinstance(notif_item, list):
+        notif_item = notif_item if notif_item else None
+    if not isinstance(notif_item, dict):
         return
     nid = notif_item.get("id", "")
     if st.session_state.get("last_pushed_id") == nid:
@@ -105,7 +124,6 @@ st.markdown(CSS_STYLE,         unsafe_allow_html=True,
     </script>
     """
     components.html(js_code, height=0)
-
 @st.cache_data(ttl=10, show_spinner=False)
 def load_cloud() -> dict:
     default = {"users": {}, "sessions": {}, "trips": {}, "notifications": [], "config": {}}
@@ -149,7 +167,8 @@ def save_cloud(data: dict) -> bool:
     except Exception as e:
         st.error(f"Lỗi mạng: {e}")
         return False
-cookie_manager = stx.CookieManager(key="team_auth_cookie_v4")
+
+cookie_manager = stx.CookieManager(key="team_auth_cookie_final")
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -162,7 +181,7 @@ db = load_cloud()
 
 if st.session_state.user is None:
     url_tk = st.query_params.get("token", "")
-    ck_tk = cookie_manager.get("team_trip_session_v4")
+    ck_tk = cookie_manager.get("team_trip_session_final")
     found_tk = ck_tk or url_tk
 
     if found_tk and found_tk in db.get("sessions", {}):
@@ -174,7 +193,7 @@ if st.session_state.user is None:
                 st.query_params["token"] = found_tk
             if not ck_tk:
                 exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-                cookie_manager.set("team_trip_session_v4", found_tk, expires_at=exp_d)
+                cookie_manager.set("team_trip_session_final", found_tk, expires_at=exp_d)
             st.rerun()
 if st.session_state.user is None:
     AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
@@ -201,7 +220,7 @@ if st.session_state.user is None:
                         fresh_db.setdefault("sessions", {})[new_tk] = name
                         save_cloud(fresh_db)
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_v4", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_final", new_tk, expires_at=exp_date)
                         st.query_params["token"] = new_tk
                         st.session_state.active_token = new_tk
                         st.session_state.user = name
@@ -229,7 +248,7 @@ if st.session_state.user is None:
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = r_name
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_v4", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_final", new_tk, expires_at=exp_date)
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.query_params["token"] = new_tk
@@ -243,13 +262,13 @@ if st.session_state.user is None:
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
 
-cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_v4")
+cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_final")
 if cur_session_tk:
     if st.query_params.get("token", "") != cur_session_tk:
         st.query_params["token"] = cur_session_tk
     if not st.session_state.get("cookie_refreshed"):
         exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-        cookie_manager.set("team_trip_session_v4", cur_session_tk, expires_at=exp_d)
+        cookie_manager.set("team_trip_session_final", cur_session_tk, expires_at=exp_d)
         st.session_state.cookie_refreshed = True
 
 need_deadline_save = False
@@ -277,7 +296,7 @@ if need_deadline_save:
 
 all_notifs = db.get("notifications", [])
 if all_notifs:
-    trigger_browser_push(all_notifs[0])
+    trigger_browser_push(all_notifs)
 
 col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
 with col_a:
@@ -295,7 +314,7 @@ with col_c:
                 del clean_db["sessions"][cur_session_tk]
                 save_cloud(clean_db)
             try:
-                cookie_manager.delete("team_trip_session_v4")
+                cookie_manager.delete("team_trip_session_final")
             except Exception:
                 pass
             time.sleep(0.5)
@@ -305,7 +324,6 @@ with col_c:
         st.session_state.user = None
         st.session_state.selected_trip = None
         st.rerun()
-
 with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đội", expanded=True):
     top_n1, top_n2 = st.columns([3.2, 2.2])
     with top_n1:
@@ -465,7 +483,6 @@ if st.button("⬅️ Quay lại danh sách chuyến đi", use_container_width=Tr
     st.session_state.selected_trip = None
     st.rerun()
 
-# Tối ưu gọn gàng khung tiêu đề + mô tả chuyến đi ngay đầu trang
 raw_desc = trip_data.get("desc", "").strip() or "Chưa có thông tin chi tiết cho chuyến đi này."
 safe_desc = html.escape(raw_desc)
 HEADER_DESC_HTML = f"""
@@ -554,7 +571,6 @@ with t_loc:
                             st.rerun()
                     else:
                         st.warning("Vui lòng nhập tên địa điểm!")
-
     locs = trip_data.get("locations", [])
     if len(locs) == 0:
         st.info("Chưa có địa điểm nào được đề xuất cho chuyến đi này.")
@@ -602,10 +618,9 @@ with t_loc:
                         if save_cloud(current_db):
                             st.rerun()
 with t_req:
-        st.markdown(
+    st.markdown(
         """
         <style>
-        /* Khóa cứng cấu trúc bảng 5 cột nằm ngang chuẩn trên cả điện thoại và máy tính */
         div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] {
             display: flex !important;
             flex-direction: row !important;
@@ -619,33 +634,27 @@ with t_req:
         div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             flex: 0 0 auto !important;
         }
-        /* Cột 1: Ô tích hoàn thành nhỏ gọn 38px */
         div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(1) {
             width: 38px !important;
             min-width: 38px !important;
             max-width: 38px !important;
         }
-        /* Cột 2: Tên vật dụng */
         div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(2) {
             width: 145px !important;
             min-width: 145px !important;
         }
-        /* Cột 3: SL / Ghi chú */
         div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(3) {
             width: 195px !important;
             min-width: 195px !important;
         }
-        /* Cột 4: Người góp */
         div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(4) {
             width: 135px !important;
             min-width: 135px !important;
         }
-        /* Cột 5: Nút Góp & Xóa */
         div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) {
             width: 130px !important;
             min-width: 130px !important;
         }
-        /* Giữ 2 nút Góp và Xóa bên trong Cột 5 luôn nằm cạnh nhau */
         div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) div[data-testid="stHorizontalBlock"] {
             overflow-x: visible !important;
             gap: 4px !important;
@@ -658,7 +667,6 @@ with t_req:
             width: 42px !important;
             min-width: 42px !important;
         }
-        /* Định dạng ô chữ & nút bấm gọn gàng */
         div[data-testid="stTextArea"] textarea {
             padding: 6px 8px !important;
             font-size: 13px !important;
@@ -679,7 +687,6 @@ with t_req:
         unsafe_allow_html=True,
     )
 
-
     can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
     reqs = trip_data.get("requirements", [])
     if not isinstance(reqs, list):
@@ -688,10 +695,9 @@ with t_req:
     extra_cols = trip_data.get("extra_cols", [])
     if not isinstance(extra_cols, list):
         extra_cols = []
-
     done_count = sum(1 for r in reqs if r.get("done", False))
     st.markdown(
-        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:9px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Trên điện thoại có thể vuốt ngang bảng để xem & bấm sửa trực tiếp.</i></div>',
+        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:9px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Bấm trực tiếp vào ô trong bảng để sửa, trên điện thoại vuốt ngang để xem hết cột.</i></div>',
         unsafe_allow_html=True,
     )
 
@@ -900,8 +906,6 @@ with t_req:
                     if save_cloud(current_db):
                         st.success("Đã lưu thay đổi!")
                         st.rerun()
-
-
 with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
