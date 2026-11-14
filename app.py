@@ -76,6 +76,17 @@ def now_vn() -> datetime.datetime:
 def make_hash(text: str) -> str:
     return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
+def get_device_sig() -> str:
+    try:
+        hdrs = st.context.headers
+        ua = str(hdrs.get("User-Agent", "")).strip()
+        lang = str(hdrs.get("Accept-Language", "")).strip()
+        if ua:
+            return make_hash(f"{ua}|{lang}")[:24]
+    except Exception:
+        pass
+    return ""
+
 def send_external_push(data_dict: dict, clean_msg: str):
     cfg = data_dict.get("config", {})
     discord_url = cfg.get("discord_webhook", "").strip()
@@ -124,7 +135,7 @@ def trigger_browser_push(notif_item):
     components.html(js_code, height=0)
 @st.cache_data(ttl=10, show_spinner=False)
 def load_cloud() -> dict:
-    default = {"users": {}, "sessions": {}, "trips": {}, "notifications": [], "config": {}}
+    default = {"users": {}, "sessions": {}, "device_sessions": {}, "trips": {}, "notifications": [], "config": {}}
     try:
         latest_url = "/".join([API_URL, "latest"])
         r = requests.get(latest_url, headers=HEADERS, timeout=10)
@@ -134,6 +145,7 @@ def load_cloud() -> dict:
             if isinstance(record, dict):
                 default["users"] = record.get("users", {})
                 default["sessions"] = record.get("sessions", {})
+                default["device_sessions"] = record.get("device_sessions", {})
                 default["notifications"] = record.get("notifications", [])
                 default["config"] = record.get("config", {})
                 trips = record.get("trips", {})
@@ -167,7 +179,7 @@ def save_cloud(data: dict) -> bool:
         st.error(f"Lỗi mạng: {e}")
         return False
 
-cookie_manager = stx.CookieManager(key="team_auth_cookie_v20")
+cookie_manager = stx.CookieManager(key="team_auth_cookie_100")
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -175,42 +187,45 @@ if "selected_trip" not in st.session_state:
     st.session_state.selected_trip = None
 if "active_token" not in st.session_state:
     st.session_state.active_token = ""
+if "boot_wait" not in st.session_state:
+    st.session_state.boot_wait = 0
 
 db = load_cloud()
-
+dev_sig = get_device_sig()
 if st.session_state.user is None:
-    url_tk = st.query_params.get("token", "")
-    ck_tk = cookie_manager.get("team_trip_session_v20")
-    found_tk = ck_tk or url_tk
+    url_tk = st.query_params.get("token", "").strip()
+    ck_tk = cookie_manager.get("team_trip_session_100")
+
+    if not url_tk and not ck_tk and st.session_state.boot_wait < 1:
+        st.session_state.boot_wait += 1
+        st.info("⏳ Đang tự động khôi phục phiên đăng nhập...")
+        time.sleep(0.8)
+        st.rerun()
+
+    found_tk = url_tk or ck_tk
+    auto_user = ""
 
     if found_tk and found_tk in db.get("sessions", {}):
-        auto_user = db["sessions"][found_tk]
-        if auto_user in db.get("users", {}):
-            st.session_state.user = auto_user
-            st.session_state.active_token = found_tk
-            if st.query_params.get("token", "") != found_tk:
-                st.query_params["token"] = found_tk
-            exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-            cookie_manager.set("team_trip_session_v20", found_tk, expires_at=exp_d)
-            st.rerun()
-    elif not url_tk:
-        components.html(
-            """
-            <script>
-            try {
-                const savedTk = window.parent.localStorage.getItem("team_trip_lq_token");
-                if (savedTk && savedTk.length > 10) {
-                    const parentUrl = new URL(window.parent.location.href);
-                    if (parentUrl.searchParams.get("token") !== savedTk) {
-                        parentUrl.searchParams.set("token", savedTk);
-                        window.parent.location.replace(parentUrl.toString());
-                    }
-                }
-            } catch (e) {}
-            </script>
-            """,
-            height=0,
-        )
+        cand_user = db["sessions"][found_tk]
+        if cand_user in db.get("users", {}):
+            auto_user = cand_user
+
+    if not auto_user and dev_sig:
+        dev_map = db.get("device_sessions", {})
+        if dev_sig in dev_map:
+            cand_user = dev_map[dev_sig]
+            if cand_user in db.get("users", {}):
+                auto_user = cand_user
+                found_tk = found_tk or secrets.token_hex(16)
+
+    if auto_user:
+        st.session_state.user = auto_user
+        st.session_state.active_token = found_tk
+        if st.query_params.get("token", "") != found_tk:
+            st.query_params["token"] = found_tk
+        exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
+        cookie_manager.set("team_trip_session_100", found_tk, expires_at=exp_d)
+        st.rerun()
 if st.session_state.user is None:
     AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
     st.markdown(AUTH_HTML, unsafe_allow_html=True)
@@ -220,7 +235,7 @@ if st.session_state.user is None:
         with st.form("login_box"):
             name = st.text_input("Tên của bạn", placeholder="Nhập tên đã đăng ký...").strip()
             pwd = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
-            st.caption("🔒 Hệ thống tự động ghi nhớ đăng nhập vĩnh viễn trên thiết bị này sau khi vào.")
+            st.caption("🔒 Hệ thống tự động ghi nhớ thiết bị này vĩnh viễn sau khi vào.")
             if st.form_submit_button("🚀 Vào Hệ Thống", use_container_width=True):
                 if not name or not pwd:
                     st.warning("Vui lòng nhập đủ tên và mật khẩu!")
@@ -234,9 +249,11 @@ if st.session_state.user is None:
                     else:
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = name
+                        if dev_sig:
+                            fresh_db.setdefault("device_sessions", {})[dev_sig] = name
                         save_cloud(fresh_db)
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_v20", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_100", new_tk, expires_at=exp_date)
                         st.query_params["token"] = new_tk
                         st.session_state.active_token = new_tk
                         st.session_state.user = name
@@ -248,7 +265,7 @@ if st.session_state.user is None:
             r_name = st.text_input("Tên hiển thị của bạn", placeholder="Ví dụ: Huy Đỗ...").strip()
             r_pwd = st.text_input("Tạo mật khẩu", type="password")
             r_pwd2 = st.text_input("Nhập lại mật khẩu", type="password")
-            st.caption("🔒 Tài khoản sẽ được lưu trực tuyến và tự động ghi nhớ trên thiết bị này.")
+            st.caption("🔒 Tài khoản và thiết bị của bạn sẽ được ghi nhớ vĩnh viễn.")
             if st.form_submit_button("✅ Đăng Ký & Lưu Online", use_container_width=True):
                 if not r_name or not r_pwd:
                     st.warning("Không được để trống tên hoặc mật khẩu!")
@@ -263,8 +280,10 @@ if st.session_state.user is None:
                         fresh_db["users"][r_name] = make_hash(r_pwd)
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = r_name
+                        if dev_sig:
+                            fresh_db.setdefault("device_sessions", {})[dev_sig] = r_name
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_v20", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_100", new_tk, expires_at=exp_date)
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.query_params["token"] = new_tk
@@ -278,26 +297,15 @@ if st.session_state.user is None:
 db = load_cloud()
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
-granted_admins = [u.strip().lower() for u in db.get("config", {}).get("granted_admins", [])]
-has_power = is_admin or (me.strip().lower() in granted_admins)
 
-cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_v20")
+cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_100")
 if cur_session_tk:
+    st.session_state.active_token = cur_session_tk
     if st.query_params.get("token", "") != cur_session_tk:
         st.query_params["token"] = cur_session_tk
-    components.html(
-        f"""
-        <script>
-        try {{
-            window.parent.localStorage.setItem("team_trip_lq_token", "{cur_session_tk}");
-        }} catch (e) {{}}
-        </script>
-        """,
-        height=0,
-    )
     if not st.session_state.get("cookie_refreshed"):
         exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-        cookie_manager.set("team_trip_session_v20", cur_session_tk, expires_at=exp_d)
+        cookie_manager.set("team_trip_session_100", cur_session_tk, expires_at=exp_d)
         st.session_state.cookie_refreshed = True
 
 need_deadline_save = False
@@ -336,30 +344,22 @@ with col_b:
         st.rerun()
 with col_c:
     if st.button("Thoát", use_container_width=True):
-        if cur_session_tk:
-            load_cloud.clear()
-            clean_db = load_cloud()
-            if cur_session_tk in clean_db.get("sessions", {}):
-                del clean_db["sessions"][cur_session_tk]
-                save_cloud(clean_db)
-            try:
-                cookie_manager.delete("team_trip_session_v20")
-            except Exception:
-                pass
-        components.html(
-            """
-            <script>
-            try {
-                window.parent.localStorage.removeItem("team_trip_lq_token");
-            } catch (e) {}
-            </script>
-            """,
-            height=0,
-        )
+        load_cloud.clear()
+        clean_db = load_cloud()
+        if cur_session_tk and cur_session_tk in clean_db.get("sessions", {}):
+            del clean_db["sessions"][cur_session_tk]
+        if dev_sig and dev_sig in clean_db.get("device_sessions", {}):
+            del clean_db["device_sessions"][dev_sig]
+        save_cloud(clean_db)
+        try:
+            cookie_manager.delete("team_trip_session_100")
+        except Exception:
+            pass
         time.sleep(0.5)
         st.query_params.clear()
         st.session_state.active_token = ""
         st.session_state.cookie_refreshed = False
+        st.session_state.boot_wait = 0
         st.session_state.user = None
         st.session_state.selected_trip = None
         st.rerun()
@@ -407,11 +407,11 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
                 if st.form_submit_button("💾 Lưu cấu hình thông báo ngoài web", use_container_width=True):
                     load_cloud.clear()
                     current_db = load_cloud()
-                    cfg_keep = current_db.get("config", {})
-                    cfg_keep["discord_webhook"] = in_discord.strip()
-                    cfg_keep["tg_token"] = in_tg_tk.strip()
-                    cfg_keep["tg_chat_id"] = in_tg_id.strip()
-                    current_db["config"] = cfg_keep
+                    current_db["config"] = {
+                        "discord_webhook": in_discord.strip(),
+                        "tg_token": in_tg_tk.strip(),
+                        "tg_chat_id": in_tg_id.strip(),
+                    }
                     if save_cloud(current_db):
                         st.success("Đã lưu cấu hình thông báo tự động!")
                         st.rerun()
@@ -565,17 +565,34 @@ if st.button("⬅️ Quay lại danh sách chuyến đi", use_container_width=Tr
     st.session_state.selected_trip = None
     st.rerun()
 
-st.markdown(
-    f'<div style="background:linear-gradient(90deg, #059669, #2563eb); border-radius:12px; padding:12px 16px; margin-bottom:12px; font-size:19px; font-weight:800; color:#ffffff !important; text-align:center;">⛺ {html.escape(cur_trip.upper())}</div>',
-    unsafe_allow_html=True,
-)
-t_loc, t_food, t_req, t_mem, t_info = st.tabs([
-    "🗳️ Bình Chọn Địa Điểm",
-    "🍽️ Bình Chọn Thức Ăn",
-    "🎒 Đồ Cần Chuẩn Bị",
-    "👥 Thành Viên",
-    "📋 Thông Tin & Lịch Trình",
-])
+raw_desc = trip_data.get("desc", "").strip() or "Chưa có thông tin chi tiết cho chuyến đi này."
+safe_desc = html.escape(raw_desc)
+HEADER_DESC_HTML = f"""
+<div class="notice-board">
+    <div style="font-size:20px; font-weight:800; color:#38bdf8; margin-bottom:8px;">⛺ {html.escape(cur_trip.upper())}</div>
+    <div class="notice-title">📢 THÔNG TIN & MÔ TẢ LỊCH TRÌNH</div>
+    <div class="notice-body">{safe_desc}</div>
+</div>
+"""
+st.markdown(HEADER_DESC_HTML, unsafe_allow_html=True)
+
+if is_admin:
+    with st.expander("✏️ Chỉnh sửa thông tin / ảnh bìa chuyến đi", expanded=False):
+        with st.form("edit_trip_desc_form"):
+            updated_desc = st.text_area("Nội dung thông báo / lịch trình", value=trip_data.get("desc", ""), height=100)
+            updated_t_img = st.text_input("Link ảnh bìa chuyến đi", value=trip_data.get("img", DEFAULT_TRIP_IMG))
+            if st.form_submit_button("💾 Lưu thay đổi", use_container_width=True):
+                load_cloud.clear()
+                current_db = load_cloud()
+                if cur_trip in current_db["trips"]:
+                    current_db["trips"][cur_trip]["desc"] = updated_desc.strip()
+                    if updated_t_img.strip().startswith("http"):
+                        current_db["trips"][cur_trip]["img"] = updated_t_img.strip()
+                    add_log(current_db, f"📝 Thông tin của **{cur_trip}** vừa được cập nhật.")
+                    if save_cloud(current_db):
+                        st.success("Đã cập nhật thông tin chuyến đi!")
+                        st.rerun()
+t_loc, t_food, t_req, t_mem = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🍽️ Bình Chọn Thức Ăn", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên"])
 
 with t_loc:
     dl_str = trip_data.get("vote_deadline", "")
@@ -686,12 +703,8 @@ with t_loc:
                         """,
                         unsafe_allow_html=True,
                     )
-                    if has_power:
-                        c1, c2 = st.columns([3.8, 1])
-                    else:
-                        c1 = st.container()
-                        c2 = None
 
+                    c1, c2 = st.columns([3.8, 1])
                     with c1:
                         if is_voting_closed:
                             st.button("🔒 Đã hết hạn", key=f"closed_{i}", disabled=True, use_container_width=True)
@@ -712,38 +725,35 @@ with t_loc:
                                     t_locs[i]["voters"] = cur_voters
                                     if save_cloud(current_db):
                                         st.rerun()
+                    with c2:
+                        if st.button("🗑️", key=f"del_loc_{i}", use_container_width=True):
+                            load_cloud.clear()
+                            current_db = load_cloud()
+                            t_locs = current_db["trips"][cur_trip]["locations"]
+                            if i < len(t_locs):
+                                removed_name = t_locs[i]["name"]
+                                t_locs.pop(i)
+                                add_log(current_db, f"🗑️ **{me}** đã xóa địa điểm **{removed_name}** (*{cur_trip}*).")
+                                if save_cloud(current_db):
+                                    st.rerun()
 
-                    if has_power and c2 is not None:
-                        with c2:
-                            if st.button("🗑️", key=f"del_loc_{i}", use_container_width=True):
+                    with st.expander("🖼️ Đổi ảnh / Sửa điểm"):
+                        with st.form(f"edit_loc_{cur_trip}_{i}"):
+                            el_name = st.text_input("Tên địa điểm", value=loc.get("name", ""))
+                            el_desc = st.text_input("Mô tả", value=loc.get("desc", ""))
+                            el_img = st.text_input("Link ảnh mới (https://...)", value=loc.get("img", ""))
+                            if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_locs = current_db["trips"][cur_trip]["locations"]
                                 if i < len(t_locs):
-                                    removed_name = t_locs[i]["name"]
-                                    t_locs.pop(i)
-                                    add_log(current_db, f"🗑️ **{me}** đã xóa địa điểm **{removed_name}** (*{cur_trip}*).")
+                                    if el_name.strip():
+                                        t_locs[i]["name"] = el_name.strip()
+                                    t_locs[i]["desc"] = el_desc.strip()
+                                    if el_img.strip().startswith("http"):
+                                        t_locs[i]["img"] = el_img.strip()
                                     if save_cloud(current_db):
                                         st.rerun()
-
-                    if has_power:
-                        with st.expander("🖼️ Đổi ảnh / Sửa điểm"):
-                            with st.form(f"edit_loc_{cur_trip}_{i}"):
-                                el_name = st.text_input("Tên địa điểm", value=loc.get("name", ""))
-                                el_desc = st.text_input("Mô tả", value=loc.get("desc", ""))
-                                el_img = st.text_input("Link ảnh mới (https://...)", value=loc.get("img", ""))
-                                if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
-                                    load_cloud.clear()
-                                    current_db = load_cloud()
-                                    t_locs = current_db["trips"][cur_trip]["locations"]
-                                    if i < len(t_locs):
-                                        if el_name.strip():
-                                            t_locs[i]["name"] = el_name.strip()
-                                        t_locs[i]["desc"] = el_desc.strip()
-                                        if el_img.strip().startswith("http"):
-                                            t_locs[i]["img"] = el_img.strip()
-                                        if save_cloud(current_db):
-                                            st.rerun()
 
                     st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_food:
@@ -848,12 +858,7 @@ with t_food:
                             """,
                             unsafe_allow_html=True,
                         )
-                        if has_power:
-                            b1, b2 = st.columns([3.8, 1])
-                        else:
-                            b1 = st.container()
-                            b2 = None
-
+                        b1, b2 = st.columns([3.8, 1])
                         with b1:
                             btn_txt = "✅ ĐÃ CHỌN (Bỏ)" if is_voted else "👍 CHỌN MÓN"
                             if st.button(btn_txt, key=f"grid_vote_food_{cur_trip}_{idx_f}", use_container_width=True):
@@ -871,42 +876,39 @@ with t_food:
                                     cur_foods[idx_f]["voters"] = v_list
                                     if save_cloud(current_db):
                                         st.rerun()
+                        with b2:
+                            if st.button("🗑️", key=f"grid_del_food_{cur_trip}_{idx_f}", use_container_width=True):
+                                load_cloud.clear()
+                                current_db = load_cloud()
+                                cur_foods = current_db["trips"][cur_trip].get("foods", [])
+                                if idx_f < len(cur_foods):
+                                    del_fn = cur_foods[idx_f].get("name", "")
+                                    cur_foods.pop(idx_f)
+                                    add_log(current_db, f"🗑️ **{me}** đã xóa món **{del_fn}** (*{cur_trip}*).")
+                                    if save_cloud(current_db):
+                                        st.rerun()
 
-                        if has_power and b2 is not None:
-                            with b2:
-                                if st.button("🗑️", key=f"grid_del_food_{cur_trip}_{idx_f}", use_container_width=True):
+                        with st.expander("🖼️ Đổi ảnh / Sửa món"):
+                            with st.form(f"edit_food_{cur_trip}_{idx_f}"):
+                                ef_name = st.text_input("Tên món", value=f_item.get("name", ""))
+                                ef_note = st.text_input("Giá / Ghi chú", value=f_item.get("note", ""))
+                                ef_img = st.text_input("Link ảnh mới (https://...)", value=f_item.get("img", ""))
+                                if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
                                     load_cloud.clear()
                                     current_db = load_cloud()
                                     cur_foods = current_db["trips"][cur_trip].get("foods", [])
                                     if idx_f < len(cur_foods):
-                                        del_fn = cur_foods[idx_f].get("name", "")
-                                        cur_foods.pop(idx_f)
-                                        add_log(current_db, f"🗑️ **{me}** đã xóa món **{del_fn}** (*{cur_trip}*).")
+                                        if ef_name.strip():
+                                            cur_foods[idx_f]["name"] = ef_name.strip()
+                                        cur_foods[idx_f]["note"] = ef_note.strip()
+                                        if ef_img.strip().startswith("http"):
+                                            cur_foods[idx_f]["img"] = ef_img.strip()
                                         if save_cloud(current_db):
                                             st.rerun()
 
-                        if has_power:
-                            with st.expander("🖼️ Đổi ảnh / Sửa món"):
-                                with st.form(f"edit_food_{cur_trip}_{idx_f}"):
-                                    ef_name = st.text_input("Tên món", value=f_item.get("name", ""))
-                                    ef_note = st.text_input("Giá / Ghi chú", value=f_item.get("note", ""))
-                                    ef_img = st.text_input("Link ảnh mới (https://...)", value=f_item.get("img", ""))
-                                    if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
-                                        load_cloud.clear()
-                                        current_db = load_cloud()
-                                        cur_foods = current_db["trips"][cur_trip].get("foods", [])
-                                        if idx_f < len(cur_foods):
-                                            if ef_name.strip():
-                                                cur_foods[idx_f]["name"] = ef_name.strip()
-                                            cur_foods[idx_f]["note"] = ef_note.strip()
-                                            if ef_img.strip().startswith("http"):
-                                                cur_foods[idx_f]["img"] = ef_img.strip()
-                                            if save_cloud(current_db):
-                                                st.rerun()
-
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_req:
-    can_manage_req = has_power
+    can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
     reqs = trip_data.get("requirements", [])
     if not isinstance(reqs, list):
         reqs = []
@@ -1081,26 +1083,24 @@ with t_req:
                                         add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_t}** (*{cur_trip}*).")
                                         if save_cloud(current_db):
                                             st.rerun()
-
-                        if has_power:
-                            with st.expander("🖼️ Gắn ảnh / Sửa mục"):
-                                with st.form(f"edit_req_{cur_trip}_{i}"):
-                                    er_task = st.text_input("Tên đồ dùng", value=req.get("task", ""))
-                                    er_note = st.text_input("SL / Ghi chú", value=req.get("qty_note", ""))
-                                    er_img = st.text_input("Link ảnh (https://...)", value=req.get("img", ""))
-                                    if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
-                                        load_cloud.clear()
-                                        current_db = load_cloud()
-                                        t_reqs = current_db["trips"][cur_trip]["requirements"]
-                                        if i < len(t_reqs):
-                                            if er_task.strip():
-                                                t_reqs[i]["task"] = er_task.strip()
-                                            t_reqs[i]["qty_note"] = er_note.strip()
-                                            if er_img.strip().startswith("http"):
-                                                t_reqs[i]["img"] = er_img.strip()
-                                            add_log(current_db, f"🖼️ **{me}** đã cập nhật **{t_reqs[i]['task']}**.")
-                                            if save_cloud(current_db):
-                                                st.rerun()
+                        with st.expander("🖼️ Gắn ảnh / Sửa mục"):
+                            with st.form(f"edit_req_{cur_trip}_{i}"):
+                                er_task = st.text_input("Tên đồ dùng", value=req.get("task", ""))
+                                er_note = st.text_input("SL / Ghi chú", value=req.get("qty_note", ""))
+                                er_img = st.text_input("Link ảnh (https://...)", value=req.get("img", ""))
+                                if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
+                                    load_cloud.clear()
+                                    current_db = load_cloud()
+                                    t_reqs = current_db["trips"][cur_trip]["requirements"]
+                                    if i < len(t_reqs):
+                                        if er_task.strip():
+                                            t_reqs[i]["task"] = er_task.strip()
+                                        t_reqs[i]["qty_note"] = er_note.strip()
+                                        if er_img.strip().startswith("http"):
+                                            t_reqs[i]["img"] = er_img.strip()
+                                        add_log(current_db, f"🖼️ **{me}** đã cập nhật **{t_reqs[i]['task']}**.")
+                                        if save_cloud(current_db):
+                                            st.rerun()
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_mem:
@@ -1108,46 +1108,6 @@ with t_mem:
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
 
     if is_admin:
-        with st.container(border=True):
-            st.markdown("👑 **Cấp Quyền Sửa Đổi & Đổi Ảnh (Bí mật — Không gửi thông báo):**")
-            other_members = [m for m in all_members if m.strip().lower() != "athuy125"]
-            cur_granted = db.get("config", {}).get("granted_admins", [])
-
-            if other_members:
-                g_col1, g_col2, g_col3 = st.columns([2.8, 1.3, 1.3])
-                with g_col1:
-                    grant_target = st.selectbox("Chọn thành viên cấp quyền", other_members, key="grant_sel_box", label_visibility="collapsed")
-                with g_col2:
-                    if st.button("✅ Cấp quyền", key="btn_grant_perm", use_container_width=True):
-                        load_cloud.clear()
-                        current_db = load_cloud()
-                        cfg = current_db.setdefault("config", {})
-                        g_list = cfg.setdefault("granted_admins", [])
-                        if grant_target not in g_list:
-                            g_list.append(grant_target)
-                            if save_cloud(current_db):
-                                st.success(f"Đã bí mật cấp quyền cho {grant_target}!")
-                                st.rerun()
-                        else:
-                            st.info(f"{grant_target} đã có quyền rồi.")
-                with g_col3:
-                    if st.button("🚫 Gỡ quyền", key="btn_revoke_perm", use_container_width=True):
-                        load_cloud.clear()
-                        current_db = load_cloud()
-                        cfg = current_db.setdefault("config", {})
-                        g_list = cfg.get("granted_admins", [])
-                        if grant_target in g_list:
-                            g_list.remove(grant_target)
-                            if save_cloud(current_db):
-                                st.warning(f"Đã gỡ quyền của {grant_target}.")
-                                st.rerun()
-
-                if cur_granted:
-                    st.caption(f"🛡️ **Đang có quyền quản trị phụ:** {', '.join(cur_granted)}")
-                else:
-                    st.caption("🛡️ Chưa cấp quyền cho thành viên nào.")
-            else:
-                st.caption("Chưa có thành viên nào khác để cấp quyền.")
         with st.container(border=True):
             st.markdown("⚙️ **Quản lý danh sách thành viên:**")
             deletable_members = [m for m in all_members if m != me]
@@ -1171,16 +1131,10 @@ with t_mem:
                             st.rerun()
             else:
                 st.caption("Không có thành viên nào khác để xóa.")
-
     if len(all_members) == 0:
         st.info("Chưa có thành viên nào đăng ký.")
     else:
-        cur_granted_lower = [u.strip().lower() for u in db.get("config", {}).get("granted_admins", [])]
         for idx, member_name in enumerate(all_members, start=1):
-            role_tag = ""
-            if is_admin and member_name.strip().lower() in cur_granted_lower:
-                role_tag = ' <span style="background:#064e3b; color:#34d399; padding:2px 8px; border-radius:8px; font-size:11px; margin-left:6px;">🛡️ Được cấp quyền</span>'
-
             voted_places = [loc["name"] for loc in locs if member_name in loc.get("voters", [])]
             vote_status = f"✅ Địa điểm: {', '.join(voted_places)}" if voted_places else "⏳ Chưa chọn địa điểm"
             voted_foods = [f["name"] for f in foods if member_name in f.get("voters", [])]
@@ -1188,34 +1142,5 @@ with t_mem:
             assigned_tasks = [req["task"] for req in reqs if member_name in req.get("assigned", "")]
             task_status = f"🎒 Góp đồ ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ"
 
-            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}{role_tag}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
+            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
             st.markdown(card_html, unsafe_allow_html=True)
-
-with t_info:
-    raw_desc = trip_data.get("desc", "").strip() or "Chưa có thông tin chi tiết cho chuyến đi này."
-    safe_desc = html.escape(raw_desc)
-    HEADER_DESC_HTML = f"""
-    <div class="notice-board">
-        <div style="font-size:20px; font-weight:800; color:#38bdf8; margin-bottom:8px;">⛺ {html.escape(cur_trip.upper())}</div>
-        <div class="notice-title">📢 THÔNG TIN & MÔ TẢ LỊCH TRÌNH</div>
-        <div class="notice-body">{safe_desc}</div>
-    </div>
-    """
-    st.markdown(HEADER_DESC_HTML, unsafe_allow_html=True)
-
-    if has_power:
-        with st.expander("✏️ Chỉnh sửa thông tin / ảnh bìa chuyến đi", expanded=False):
-            with st.form("edit_trip_desc_form"):
-                updated_desc = st.text_area("Nội dung thông báo / lịch trình", value=trip_data.get("desc", ""), height=130)
-                updated_t_img = st.text_input("Link ảnh bìa chuyến đi", value=trip_data.get("img", DEFAULT_TRIP_IMG))
-                if st.form_submit_button("💾 Lưu thay đổi", use_container_width=True):
-                    load_cloud.clear()
-                    current_db = load_cloud()
-                    if cur_trip in current_db["trips"]:
-                        current_db["trips"][cur_trip]["desc"] = updated_desc.strip()
-                        if updated_t_img.strip().startswith("http"):
-                            current_db["trips"][cur_trip]["img"] = updated_t_img.strip()
-                        add_log(current_db, f"📝 Thông tin của **{cur_trip}** vừa được cập nhật.")
-                        if save_cloud(current_db):
-                            st.success("Đã cập nhật thông tin chuyến đi!")
-                            st.rerun()
