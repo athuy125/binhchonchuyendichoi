@@ -81,43 +81,14 @@ button[kind="primaryFormSubmit"], [data-testid="stFormSubmitButton"] > button {
 .grid-cell { padding: 6px 4px; font-size: 13.5px; color: #ffffff !important; border-bottom: 1px solid #1e293b; }
 </style>
 """
-st.markdown(CSS_STYLE, unsafe_allow_html=True)
-def now_vn() -> datetime.datetime:
-    return datetime.datetime.utcnow() + datetime.timedelta(hours=7)
+st.markdown(CSS_STYLE,         unsafe_allow_html=True,
+    )
 
-def make_hash(text: str) -> str:
-    return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
+    can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
+    reqs = trip_data.get("requirements", [])
+    if not isinstance(reqs, list):
+        reqs = []
 
-def send_external_push(data_dict: dict, clean_msg: str):
-    cfg = data_dict.get("config", {})
-    discord_url = cfg.get("discord_webhook", "").strip()
-    tg_token = cfg.get("tg_token", "").strip()
-    tg_chat = cfg.get("tg_chat_id", "").strip()
-    if discord_url:
-        try:
-            requests.post(discord_url, json={"content": f"⛺ **THÔNG BÁO ĐỘI:** {clean_msg}"}, timeout=4)
-        except Exception:
-            pass
-    if tg_token and tg_chat:
-        try:
-            tg_api = f"https://telegram.org{tg_token}/sendMessage"
-            requests.post(tg_api, json={"chat_id": tg_chat, "text": f"⛺ THÔNG BÁO ĐỘI:\n{clean_msg}"}, timeout=4)
-        except Exception:
-            pass
-
-def add_log(data_dict: dict, msg: str, is_important: bool = False):
-    logs = data_dict.get("notifications", [])
-    ts = now_vn().strftime("%H:%M %d/%m/%Y")
-    item_id = f"{now_vn().timestamp()}_{len(logs)}"
-    logs.insert(0, {"id": item_id, "time": ts, "msg": msg, "important": is_important})
-    data_dict["notifications"] = logs[:40]
-    plain_msg = msg.replace("**", "").replace("*", "")
-    send_external_push(data_dict, plain_msg)
-
-def trigger_browser_push(notif_item):
-    if isinstance(notif_item, list):
-        notif_item = notif_item[0] if notif_item else None
-    if not isinstance(notif_item, dict):
         return
     nid = notif_item.get("id", "")
     if st.session_state.get("last_pushed_id") == nid:
