@@ -631,39 +631,63 @@ with t_loc:
                         if save_cloud(current_db):
                             st.rerun()
 with t_req:
-    st.markdown(
+        st.markdown(
         """
         <style>
-        /* Khóa cứng các cột nằm ngang trên cả điện thoại và máy tính, cho phép vuốt ngang mượt mà */
-        div[data-testid="stHorizontalBlock"] {
+        /* Khóa cứng cấu trúc bảng 5 cột nằm ngang chuẩn trên cả điện thoại và máy tính */
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] {
+            display: flex !important;
+            flex-direction: row !important;
             flex-wrap: nowrap !important;
             overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
             gap: 6px !important;
             align-items: stretch !important;
         }
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"],
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
             flex: 0 0 auto !important;
         }
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
-            min-width: 42px !important;
-            width: 42px !important;
+        /* Cột 1: Ô tích hoàn thành nhỏ gọn 38px */
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(1) {
+            width: 38px !important;
+            min-width: 38px !important;
+            max-width: 38px !important;
         }
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
-            min-width: 155px !important;
-            width: 24% !important;
-        }
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(3) {
-            min-width: 210px !important;
-            width: 32% !important;
-        }
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(4) {
+        /* Cột 2: Tên vật dụng */
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(2) {
+            width: 145px !important;
             min-width: 145px !important;
-            width: 22% !important;
         }
-        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(5) {
+        /* Cột 3: SL / Ghi chú */
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(3) {
+            width: 195px !important;
+            min-width: 195px !important;
+        }
+        /* Cột 4: Người góp */
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(4) {
+            width: 135px !important;
             min-width: 135px !important;
-            width: 16% !important;
         }
+        /* Cột 5: Nút Góp & Xóa */
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) {
+            width: 130px !important;
+            min-width: 130px !important;
+        }
+        /* Giữ 2 nút Góp và Xóa bên trong Cột 5 luôn nằm cạnh nhau */
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) div[data-testid="stHorizontalBlock"] {
+            overflow-x: visible !important;
+            gap: 4px !important;
+        }
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) div[data-testid="stHorizontalBlock"] > div:nth-child(1) {
+            width: 82px !important;
+            min-width: 82px !important;
+        }
+        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) div[data-testid="stHorizontalBlock"] > div:nth-child(2) {
+            width: 42px !important;
+            min-width: 42px !important;
+        }
+        /* Định dạng ô chữ & nút bấm gọn gàng */
         div[data-testid="stTextArea"] textarea {
             padding: 6px 8px !important;
             font-size: 13px !important;
@@ -673,7 +697,7 @@ with t_req:
             word-wrap: break-word !important;
             border-radius: 6px !important;
         }
-        div[data-testid="column"] div.stButton > button {
+        div[data-testid="stTabs"] div.stButton > button {
             padding: 4px 6px !important;
             font-size: 12.5px !important;
             min-height: 40px !important;
@@ -683,6 +707,7 @@ with t_req:
         """,
         unsafe_allow_html=True,
     )
+
 
     can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
     reqs = trip_data.get("requirements", [])
