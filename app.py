@@ -634,8 +634,21 @@ with t_req:
     st.markdown(
         """
         <style>
-        div[data-testid="stTextInput"] input { padding: 6px 10px !important; font-size: 13.5px !important; min-height: 36px !important; }
-        div[data-testid="column"] div.stButton > button { padding: 4px 6px !important; font-size: 13px !important; min-height: 36px !important; white-space: nowrap !important; }
+        div[data-testid="stTextArea"] textarea {
+            padding: 6px 10px !important;
+            font-size: 13.5px !important;
+            line-height: 1.4 !important;
+            min-height: 40px !important;
+            resize: vertical !important;
+            white-space: pre-wrap !important;
+            word-wrap: break-word !important;
+        }
+        div[data-testid="column"] div.stButton > button {
+            padding: 4px 6px !important;
+            font-size: 13px !important;
+            min-height: 40px !important;
+            white-space: nowrap !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -652,7 +665,7 @@ with t_req:
 
     done_count = sum(1 for r in reqs if r.get("done", False))
     st.markdown(
-        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:9px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Bấm trực tiếp vào ô trong bảng để sửa, sau đó bấm <b>💾 Lưu</b>.</i></div>',
+        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:9px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Ô chữ dài sẽ tự xuống dòng & mở rộng hàng. Bấm <b>💾 Lưu</b> sau khi sửa.</i></div>',
         unsafe_allow_html=True,
     )
 
@@ -698,7 +711,6 @@ with t_req:
                     add_log(current_db, f"📊 **{me}** đã thêm cột **{col_clean}** vào bảng (*{cur_trip}*).")
                     if save_cloud(current_db):
                         st.rerun()
-
     categories_order = ["📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"]
     cat_themes = {
         "📦 Nhu Yếu Phẩm & Vật Dụng": ("linear-gradient(90deg, #1d4ed8, #0f172a)", "#60a5fa", "#dbeafe"),
@@ -712,6 +724,16 @@ with t_req:
         if c_name not in existing_cats:
             existing_cats.append(c_name)
     all_cats = categories_order + [c for c in existing_cats if c not in categories_order]
+
+    def calc_box_height(texts_list):
+        max_lines = 1
+        for txt, chars_per_line in texts_list:
+            if txt:
+                lines = sum(max(1, (len(part) + chars_per_line - 1) // chars_per_line) for part in txt.split("\n"))
+                if lines > max_lines:
+                    max_lines = lines
+        return max(42, max_lines * 22 + 18)
+
     for cat_idx, cat_title in enumerate(all_cats):
         cat_indices = [idx for idx, r in enumerate(reqs) if r.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng") == cat_title]
         bg_grad, border_col, txt_col = cat_themes.get(
@@ -723,7 +745,6 @@ with t_req:
             unsafe_allow_html=True,
         )
 
-        # Hàng tiêu đề cột chuẩn của bảng
         th1, th2, th3, th4, th5 = st.columns([0.38, 1.65, 2.05, 1.45, 1.37])
         with th1:
             st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 2px; font-size:11px; font-weight:800; color:#cbd5e1 !important; text-align:center;">TT</div>', unsafe_allow_html=True)
@@ -742,10 +763,14 @@ with t_req:
             for i in cat_indices:
                 req = reqs[i]
                 is_done = bool(req.get("done", False))
+                task_val = str(req.get("task", ""))
+                note_val = str(req.get("qty_note", ""))
                 raw_who = str(req.get("assigned", "")).strip()
                 clean_who = "" if raw_who in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"] else raw_who
                 contributors = [x.strip() for x in clean_who.split(",") if x.strip()]
                 already_joined = (me in contributors)
+
+                row_h = calc_box_height([(task_val, 18), (note_val, 24), (clean_who, 16)])
 
                 c_chk, c_task, c_note, c_who, c_btn = st.columns([0.38, 1.65, 2.05, 1.45, 1.37])
 
@@ -763,14 +788,13 @@ with t_req:
                                 st.rerun()
 
                 with c_task:
-                    st.text_input("Vật dụng", value=str(req.get("task", "")), placeholder="Tên vật dụng...", key=f"tbl_task_{cur_trip}_{i}", label_visibility="collapsed")
+                    st.text_area("Vật dụng", value=task_val, height=row_h, placeholder="Tên vật dụng...", key=f"tbl_task_{cur_trip}_{i}", label_visibility="collapsed")
 
                 with c_note:
-                    st.text_input("Ghi chú", value=str(req.get("qty_note", "")), placeholder="SL / Ghi chú...", key=f"tbl_note_{cur_trip}_{i}", label_visibility="collapsed")
+                    st.text_area("Ghi chú", value=note_val, height=row_h, placeholder="SL / Ghi chú...", key=f"tbl_note_{cur_trip}_{i}", label_visibility="collapsed")
 
                 with c_who:
-                    st.text_input("Người góp", value=clean_who, placeholder="Chưa ai góp...", key=f"tbl_who_{cur_trip}_{i}", label_visibility="collapsed")
-
+                    st.text_area("Người góp", value=clean_who, height=row_h, placeholder="Chưa ai góp...", key=f"tbl_who_{cur_trip}_{i}", label_visibility="collapsed")
                 with c_btn:
                     b_g1, b_g2 = st.columns([2.2, 1])
                     with b_g1:
@@ -812,7 +836,9 @@ with t_req:
                     ec_cols = st.columns(len(extra_cols))
                     for ec_i, ec_name in enumerate(extra_cols):
                         with ec_cols[ec_i]:
-                            st.text_input(ec_name, value=str(req.get(ec_name, "")), placeholder=f"{ec_name}...", key=f"tbl_ec_{cur_trip}_{i}_{ec_name}")
+                            ec_val = str(req.get(ec_name, ""))
+                            ec_h = calc_box_height([(ec_val, 35)])
+                            st.text_area(ec_name, value=ec_val, height=ec_h, placeholder=f"{ec_name}...", key=f"tbl_ec_{cur_trip}_{i}_{ec_name}")
 
                 st.markdown('<div style="border-bottom:1px solid #1e293b; margin:2px 0 6px 0;"></div>', unsafe_allow_html=True)
 
@@ -848,7 +874,6 @@ with t_req:
                     if save_cloud(current_db):
                         st.success("Đã lưu thay đổi!")
                         st.rerun()
-
 
 with t_mem:
     all_members = list(db["users"].keys())
