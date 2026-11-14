@@ -209,7 +209,7 @@ if st.session_state.user is None:
                         fresh_db.setdefault("sessions", {})[new_tk] = name
                         save_cloud(fresh_db)
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                                   cookie_manager.set("team_trip_session_lq", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_lq", new_tk, expires_at=exp_date)
                         st.query_params["token"] = new_tk
                         st.session_state.active_token = new_tk
                         st.session_state.user = name
@@ -237,8 +237,7 @@ if st.session_state.user is None:
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = r_name
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                                                cookie_manager.set("team_trip_session_lq", new_tk, expires_at=exp_date)
-
+                        cookie_manager.set("team_trip_session_lq", new_tk, expires_at=exp_date)
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.query_params["token"] = new_tk
@@ -249,6 +248,7 @@ if st.session_state.user is None:
                             st.rerun()
 
     st.stop()
+
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
 
