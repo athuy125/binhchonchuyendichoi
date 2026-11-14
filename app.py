@@ -621,7 +621,7 @@ with t_loc:
                             st.rerun()
                     else:
                         st.warning("Vui lòng nhập tên địa điểm!")
-    locs = trip_data.get("locations", [])
+        locs = trip_data.get("locations", [])
     if len(locs) == 0:
         st.info("Chưa có địa điểm nào được đề xuất cho chuyến đi này.")
     else:
@@ -646,7 +646,7 @@ with t_loc:
                         f"""
                         <div style="background:#131b2e; border:2px solid {card_border}; border-radius:14px; overflow:hidden; margin-bottom:8px;">
                             <div style="position:relative; width:100%; height:165px; background:#090d16;">
-                                <img src="{html.escape(loc_img_url)}" style="width:100%; height:165px; object-fit:cover; display:block;" />
+                                <img src="{html.escape(loc_img_url)}" onerror="this.onerror=null;this.src='{DEFAULT_LOC_IMG}';" style="width:100%; height:165px; object-fit:cover; display:block;" />
                                 <span style="position:absolute; top:8px; right:8px; background:#064e3b; color:#6ee7b7 !important; padding:4px 11px; border-radius:12px; font-size:12.5px; font-weight:800; border:1px solid #10b981;">🔥 {len(voters)} phiếu</span>
                             </div>
                             <div style="padding:12px; text-align:center;">
@@ -691,7 +691,26 @@ with t_loc:
                                 add_log(current_db, f"🗑️ **{me}** đã xóa địa điểm **{removed_name}** (*{cur_trip}*).")
                                 if save_cloud(current_db):
                                     st.rerun()
+
+                    with st.expander("🖼️ Đổi ảnh / Sửa địa điểm này", expanded=False):
+                        with st.form(f"edit_loc_form_{cur_trip}_{i}"):
+                            el_name = st.text_input("Tên địa điểm", value=loc.get("name", ""))
+                            el_desc = st.text_input("Mô tả", value=loc.get("desc", ""))
+                            el_img = st.text_input("Dán link hình ảnh mới", value=loc.get("img", ""), placeholder="https://...")
+                            if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
+                                load_cloud.clear()
+                                current_db = load_cloud()
+                                t_locs = current_db["trips"][cur_trip]["locations"]
+                                if i < len(t_locs):
+                                    if el_name.strip():
+                                        t_locs[i]["name"] = el_name.strip()
+                                    t_locs[i]["desc"] = el_desc.strip()
+                                    t_locs[i]["img"] = el_img.strip() if el_img.strip().startswith("http") else DEFAULT_LOC_IMG
+                                    if save_cloud(current_db):
+                                        st.rerun()
+
                     st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
+
 with t_food:
     DEFAULT_FOOD_IMGS = {
         "🍖 Món chính": "https://unsplash.com",
@@ -890,6 +909,12 @@ with t_req:
                         st.rerun()
                 else:
                     st.warning("Vui lòng nhập tên vật dụng!")
+        SAFE_REQ_IMGS = {
+        "📦 Nhu Yếu Phẩm & Vật Dụng": "https://pexels.com",
+        "🍖 Thức Ăn & Nước Uống": "https://pexels.com",
+        "🍳 Dụng Cụ Nấu Ăn & Khác": "https://pexels.com",
+    }
+
     req_filter = st.radio(
         "Lọc đồ dùng:",
         ["📋 Tất cả đồ dùng", "📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"],
@@ -920,9 +945,10 @@ with t_req:
                     req = reqs[i]
                     is_done = bool(req.get("done", False))
                     r_cat = req.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng")
+                    fallback_img = SAFE_REQ_IMGS.get(r_cat, SAFE_REQ_IMGS["📦 Nhu Yếu Phẩm & Vật Dụng"])
                     r_img = str(req.get("img", "")).strip()
-                    if not r_img.startswith("http"):
-                        r_img = DEFAULT_REQ_IMGS.get(r_cat, DEFAULT_REQ_IMGS["📦 Nhu Yếu Phẩm & Vật Dụng"])
+                    if not r_img.startswith("http") or "unsplash.com" in r_img:
+                        r_img = fallback_img
 
                     cur_assigned = req.get("assigned", "").strip()
                     contributors = [x.strip() for x in cur_assigned.split(",") if x.strip() and x.strip() not in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"]]
@@ -938,7 +964,7 @@ with t_req:
                             f"""
                             <div style="background:#131b2e; border:2px solid {card_border}; border-radius:14px; overflow:hidden; margin-bottom:8px;">
                                 <div style="position:relative; width:100%; height:150px; background:#090d16;">
-                                    <img src="{html.escape(r_img)}" style="width:100%; height:150px; object-fit:cover; display:block;" />
+                                    <img src="{html.escape(r_img)}" onerror="this.onerror=null;this.src='{fallback_img}';" style="width:100%; height:150px; object-fit:cover; display:block;" />
                                     <span style="position:absolute; top:8px; left:8px; background:rgba(15,23,42,0.88); color:#93c5fd !important; padding:3px 8px; border-radius:8px; font-size:11px; font-weight:700;">{html.escape(r_cat)}</span>
                                     {status_html}
                                 </div>
@@ -951,6 +977,7 @@ with t_req:
                             """,
                             unsafe_allow_html=True,
                         )
+
                         if can_manage_req:
                             rb1, rb2, rb3 = st.columns([2.8, 1, 1])
                         else:
@@ -1007,7 +1034,26 @@ with t_req:
                                         if save_cloud(current_db):
                                             st.rerun()
 
-                        st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
+                        # Khung gắn hình ảnh & chỉnh sửa cho tất cả các mục cũ lẫn mới
+                        with st.expander("🖼️ Gắn ảnh / Sửa mục này", expanded=False):
+                            with st.form(f"edit_req_card_{cur_trip}_{i}"):
+                                er_task = st.text_input("Tên vật dụng", value=req.get("task", ""))
+                                er_note = st.text_input("SL / Ghi chú", value=req.get("qty_note", ""))
+                                er_img = st.text_input("Dán link ảnh món đồ (https://...)", value=req.get("img", ""), placeholder="Dán link ảnh từ Google/Facebook...")
+                                if st.form_submit_button("💾 Lưu ảnh & thông tin", use_container_width=True):
+                                    load_cloud.clear()
+                                    current_db = load_cloud()
+                                    t_reqs = current_db["trips"][cur_trip]["requirements"]
+                                    if i < len(t_reqs):
+                                        if er_task.strip():
+                                            t_reqs[i]["task"] = er_task.strip()
+                                        t_reqs[i]["qty_note"] = er_note.strip()
+                                        if er_img.strip().startswith("http"):
+                                            t_reqs[i]["img"] = er_img.strip()
+                                            add_log(current_db, f"🖼️ {me} đã cập nhật ảnh/thông tin cho {t_reqs[i]['task']} ({cur_trip}).")
+                                                if save_cloud(current_db):
+                                                    st.rerun()
+                                                    st.markdown("", unsafe_allow_html=True)
 with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
