@@ -618,231 +618,174 @@ with t_loc:
                         if save_cloud(current_db):
                             st.rerun()
 with t_req:
-    st.markdown(
-        """
-        <style>
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-            overflow-x: auto !important;
-            -webkit-overflow-scrolling: touch !important;
-            gap: 6px !important;
-            align-items: stretch !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"],
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-            flex: 0 0 auto !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(1) {
-            width: 38px !important;
-            min-width: 38px !important;
-            max-width: 38px !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(2) {
-            width: 145px !important;
-            min-width: 145px !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(3) {
-            width: 195px !important;
-            min-width: 195px !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(4) {
-            width: 135px !important;
-            min-width: 135px !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) {
-            width: 130px !important;
-            min-width: 130px !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) div[data-testid="stHorizontalBlock"] {
-            overflow-x: visible !important;
-            gap: 4px !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) div[data-testid="stHorizontalBlock"] > div:nth-child(1) {
-            width: 82px !important;
-            min-width: 82px !important;
-        }
-        div[data-testid="stTabs"] div[data-testid="stHorizontalBlock"]:has(> div:nth-child(5)) > div:nth-child(5) div[data-testid="stHorizontalBlock"] > div:nth-child(2) {
-            width: 42px !important;
-            min-width: 42px !important;
-        }
-        div[data-testid="stTextArea"] textarea {
-            padding: 6px 8px !important;
-            font-size: 13px !important;
-            line-height: 1.4 !important;
-            min-height: 40px !important;
-            white-space: pre-wrap !important;
-            word-wrap: break-word !important;
-            border-radius: 6px !important;
-        }
-        div[data-testid="stTabs"] div.stButton > button {
-            padding: 4px 6px !important;
-            font-size: 12.5px !important;
-            min-height: 40px !important;
-            white-space: nowrap !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
     can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
     reqs = trip_data.get("requirements", [])
     if not isinstance(reqs, list):
         reqs = []
 
-    extra_cols = trip_data.get("extra_cols", [])
-    if not isinstance(extra_cols, list):
-        extra_cols = []
-    done_count = sum(1 for r in reqs if r.get("done", False))
-    st.markdown(
-        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:9px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Bấm trực tiếp vào ô trong bảng để sửa, trên điện thoại vuốt ngang để xem hết cột.</i></div>',
-        unsafe_allow_html=True,
-    )
-
-    col_tool1, col_tool2 = st.columns([2.1, 2.9])
-    with col_tool1:
-        if can_manage_req:
-            if st.button("📥 Nạp danh sách mẫu chuẩn", key="load_sample_reqs", use_container_width=True):
+    if can_manage_req:
+        with st.expander("⚡ Nạp nhanh danh sách mẫu (Như bảng chuẩn)", expanded=False):
+            st.caption("Tự động thêm toàn bộ các mục nhu yếu phẩm, thức ăn, dụng cụ vào chuyến đi này.")
+            if st.button("📥 Nạp danh sách mẫu vào chuyến đi", key="load_sample_reqs", use_container_width=True):
                 load_cloud.clear()
                 current_db = load_cloud()
                 sample_items = [
-                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Đèn Pin", "qty_note": "Góp càng nhiều càng tốt (đi sáng sớm).", "assigned": "", "done": False},
-                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Dụng cụ y tế cần thiết", "qty_note": "Ai có mang thêm, thiếu nhóm chi quỹ mua.", "assigned": "", "done": False},
-                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Đồ Dùng Thiết Yếu Cá Nhân", "qty_note": "Tự túc gọn nhẹ, tránh mang đồ cồng kềnh.", "assigned": "Tự túc cá nhân", "done": False},
-                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Thiết Bị Điện (Sạc dự phòng, dây sạc)", "qty_note": "Ai có mang thêm dự phòng.", "assigned": "", "done": False},
-                    {"category": "🍖 Thức Ăn & Nước Uống", "task": "Nước uống", "qty_note": "Dự kiến 2 thùng 20L + nước ngọt các loại.", "assigned": "", "done": False},
-                    {"category": "🍖 Thức Ăn & Nước Uống", "task": "Thức Ăn Chính & Đồ Nướng", "qty_note": "Lên thực đơn và chia nhóm đi chợ.", "assigned": "", "done": False},
-                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Dao Kéo", "qty_note": "Báo Gia Huy kiểm kê số lượng.", "assigned": "Gia Huy", "done": False},
-                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Dụng cụ nấu ăn", "qty_note": "Cần góp thêm ngoài bộ của Hoàng Phát.", "assigned": "Hoàng Phát", "done": False},
-                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Than nướng", "qty_note": "Dự kiến 2-3 Kg. Ai có ib Gia Huy.", "assigned": "Gia Huy", "done": False},
+                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Đèn Pin", "qty_note": "Nhà ai có góp vô càng nhiều càng tốt (vì dự kiến sẽ đi vào lúc sáng sớm).", "assigned": "Chưa có người góp", "done": False},
+                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Dụng cụ y tế cần thiết", "qty_note": "Ai có thì cứ mang càng nhiều càng tốt, không có thì nhóm sẽ chi tiền ra đi mua.", "assigned": "Chưa có người góp", "done": False},
+                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Đồ Dùng Thiết Yếu Cá Nhân", "qty_note": "Phần này mn tự lo muốn mang gì thì mang (tránh mang đồ không cần thiết gây nặng và mất diện tích).", "assigned": "Tự túc cá nhân", "done": False},
+                    {"category": "📦 Nhu Yếu Phẩm & Vật Dụng", "task": "Thiết Bị Điện (Sạc dự phòng, dây sạc,...)", "qty_note": "Ai có thì cứ mang càng nhiều càng tốt.", "assigned": "Chưa có người góp", "done": False},
+                    {"category": "🍖 Thức Ăn & Nước Uống", "task": "Nước uống", "qty_note": "Dự kiến 2 thùng 20 lít và nước ngọt các loại.", "assigned": "Chưa có người góp", "done": False},
+                    {"category": "🍖 Thức Ăn & Nước Uống", "task": "Thức Ăn Chính & Đồ Nướng", "qty_note": "Lên thực đơn và chia nhóm đi chợ chuẩn bị.", "assigned": "Chưa có người góp", "done": False},
+                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Dao Kéo", "qty_note": "Ai đóng góp thì nhắn cho Gia Huy để kiểm kê lại.", "assigned": "Gia Huy", "done": False},
+                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Dụng cụ nấu ăn", "qty_note": "Hiện tại có Hoàng Phát lo, nhưng vẫn cần thêm (ai góp gì báo Gia Huy kiểm kê lại).", "assigned": "Hoàng Phát", "done": False},
+                    {"category": "🍳 Dụng Cụ Nấu Ăn & Khác", "task": "Than", "qty_note": "Dự kiến là 2-3 Kg. Ai nhà có và muốn đóng góp thì ib Gia Huy.", "assigned": "Gia Huy", "done": False},
                 ]
                 current_db["trips"][cur_trip]["requirements"].extend(sample_items)
                 add_log(current_db, f"📋 **{me}** đã nạp danh sách đồ dùng chuẩn cho *{cur_trip}*.")
                 if save_cloud(current_db):
                     st.rerun()
 
-    with col_tool2:
-        with st.form("add_col_inline_form", clear_on_submit=True):
-            c_in1, c_in2 = st.columns([2.7, 1.3])
-            with c_in1:
-                new_col_txt = st.text_input("Thêm cột", placeholder="Tên cột mới (VD: Chi phí, Nơi mua)...", label_visibility="collapsed")
-            with c_in2:
-                btn_add_col = st.form_submit_button("➕ Thêm cột", use_container_width=True)
-            if btn_add_col and new_col_txt.strip():
-                col_clean = new_col_txt.strip()
-                load_cloud.clear()
-                current_db = load_cloud()
-                cur_ec = current_db["trips"][cur_trip].get("extra_cols", [])
-                if col_clean not in cur_ec:
-                    cur_ec.append(col_clean)
-                    current_db["trips"][cur_trip]["extra_cols"] = cur_ec
-                    for item in current_db["trips"][cur_trip].get("requirements", []):
-                        item.setdefault(col_clean, "")
-                    add_log(current_db, f"📊 **{me}** đã thêm cột **{col_clean}** vào bảng (*{cur_trip}*).")
+    with st.expander("➕ Thêm Vật Dụng / Món Ăn Mới Vào Bảng", expanded=False):
+        with st.form("add_req_form", clear_on_submit=True):
+            c_add1, c_add2 = st.columns(2)
+            with c_add1:
+                cat_choice = st.selectbox("Chọn phần / bảng", ["📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"])
+            with c_add2:
+                t_name = st.text_input("Tên vật dụng / món ăn", placeholder="VD: Đèn pin, Than, Nước suối...")
+            c_add3, c_add4 = st.columns([2.5, 1.5])
+            with c_add3:
+                t_qty = st.text_input("SL / Ghi chú chi tiết", placeholder="VD: Dự kiến 2-3 Kg, ai có góp thêm...")
+            with c_add4:
+                t_who = st.text_input("Người phụ trách / Góp", value="Chưa có người góp")
+            if st.form_submit_button("✅ Thêm Vào Bảng", use_container_width=True):
+                if t_name.strip():
+                    load_cloud.clear()
+                    current_db = load_cloud()
+                    new_req = {
+                        "category": cat_choice,
+                        "task": t_name.strip(),
+                        "qty_note": t_qty.strip() or "Theo thực tế",
+                        "assigned": t_who.strip() or "Chưa có người góp",
+                        "done": False,
+                    }
+                    current_db["trips"][cur_trip]["requirements"].append(new_req)
+                    add_log(current_db, f"🎒 **{me}** đã thêm **{t_name.strip()}** vào bảng *{cat_choice}* ({cur_trip}).")
                     if save_cloud(current_db):
                         st.rerun()
-    categories_order = ["📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"]
-    cat_themes = {
-        "📦 Nhu Yếu Phẩm & Vật Dụng": ("linear-gradient(90deg, #1d4ed8, #0f172a)", "#60a5fa", "#dbeafe"),
-        "🍖 Thức Ăn & Nước Uống": ("linear-gradient(90deg, #b45309, #1c1917)", "#f59e0b", "#fef3c7"),
-        "🍳 Dụng Cụ Nấu Ăn & Khác": ("linear-gradient(90deg, #047857, #064e3b)", "#10b981", "#d1fae5"),
-    }
+                else:
+                    st.warning("Vui lòng nhập tên vật dụng!")
+    if len(reqs) == 0:
+        st.info("Chưa có đồ dùng nào trong danh sách của chuyến đi này.")
+    else:
+        done_count = sum(1 for r in reqs if r.get("done", False))
+        st.caption(f"📊 **Tổng tiến độ chuẩn bị:** Đã hoàn thành **{done_count}/{len(reqs)}** mục")
 
-    existing_cats = []
-    for r in reqs:
-        c_name = r.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng")
-        if c_name not in existing_cats:
-            existing_cats.append(c_name)
-    all_cats = categories_order + [c for c in existing_cats if c not in categories_order]
+        categories_order = ["📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"]
+        cat_themes = {
+            "📦 Nhu Yếu Phẩm & Vật Dụng": ("linear-gradient(90deg, #1d4ed8, #0f172a)", "#3b82f6", "#dbeafe"),
+            "🍖 Thức Ăn & Nước Uống": ("linear-gradient(90deg, #b45309, #1c1917)", "#f59e0b", "#fef3c7"),
+            "🍳 Dụng Cụ Nấu Ăn & Khác": ("linear-gradient(90deg, #047857, #064e3b)", "#10b981", "#d1fae5"),
+        }
 
-    def calc_box_height(texts_list):
-        max_lines = 1
-        for txt, chars_per_line in texts_list:
-            if txt:
-                lines = sum(max(1, (len(part) + chars_per_line - 1) // chars_per_line) for part in txt.split("\n"))
-                if lines > max_lines:
-                    max_lines = lines
-        return max(42, max_lines * 22 + 18)
+        existing_cats = []
+        for r in reqs:
+            c_name = r.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng")
+            if c_name not in existing_cats:
+                existing_cats.append(c_name)
+        all_cats = [c for c in categories_order if c in existing_cats] + [c for c in existing_cats if c not in categories_order]
 
-    for cat_idx, cat_title in enumerate(all_cats):
-        cat_indices = [idx for idx, r in enumerate(reqs) if r.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng") == cat_title]
-        bg_grad, border_col, txt_col = cat_themes.get(
-            cat_title, ("linear-gradient(90deg, #1e3a8a, #0f172a)", "#3b82f6", "#93c5fd")
-        )
+        for cat_title in all_cats:
+            cat_indices = [idx for idx, r in enumerate(reqs) if r.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng") == cat_title]
+            if not cat_indices:
+                continue
 
-        st.markdown(
-            f'<div style="background:{bg_grad}; border:1px solid {border_col}; border-radius:10px 10px 0 0; padding:10px 14px; font-weight:800; color:{txt_col} !important; font-size:15px; margin-top:20px;">{html.escape(cat_title)} ({len(cat_indices)} mục)</div>',
-            unsafe_allow_html=True,
-        )
+            bg_grad, border_col, txt_col = cat_themes.get(
+                cat_title, ("linear-gradient(90deg, #1e3a8a, #0f172a)", "#3b82f6", "#93c5fd")
+            )
 
-        th1, th2, th3, th4, th5 = st.columns([0.4, 1.65, 2.05, 1.45, 1.35])
-        with th1:
-            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 2px; font-size:11px; font-weight:800; color:#cbd5e1 !important; text-align:center;">TT</div>', unsafe_allow_html=True)
-        with th2:
-            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 8px; font-size:11px; font-weight:800; color:#cbd5e1 !important;">VẬT DỤNG</div>', unsafe_allow_html=True)
-        with th3:
-            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 8px; font-size:11px; font-weight:800; color:#cbd5e1 !important;">SL / GHI CHÚ</div>', unsafe_allow_html=True)
-        with th4:
-            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 8px; font-size:11px; font-weight:800; color:#cbd5e1 !important;">NGƯỜI GÓP</div>', unsafe_allow_html=True)
-        with th5:
-            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 4px; font-size:11px; font-weight:800; color:#cbd5e1 !important; text-align:center;">THAO TÁC</div>', unsafe_allow_html=True)
-
-        if not cat_indices:
-            st.caption("Chưa có mục nào trong bảng này. Bấm nút bên dưới để thêm dòng mới.")
-        else:
+            rows_html = ""
             for i in cat_indices:
-                req = reqs[i]
-                is_done = bool(req.get("done", False))
-                task_val = str(req.get("task", ""))
-                note_val = str(req.get("qty_note", ""))
-                raw_who = str(req.get("assigned", "")).strip()
-                clean_who = "" if raw_who in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"] else raw_who
-                contributors = [x.strip() for x in clean_who.split(",") if x.strip()]
-                already_joined = (me in contributors)
+                r = reqs[i]
+                is_done = r.get("done", False)
+                status_badge = '<span style="background:#064e3b; color:#34d399; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:700;">✅ Đã xong</span>' if is_done else '<span style="background:#334155; color:#fbbf24; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600;">⏳ Đang lo</span>'
+                task_txt = html.escape(r.get("task", ""))
+                if is_done:
+                    task_txt = f'<span style="text-decoration:line-through; opacity:0.65;">{task_txt}</span>'
+                note_txt = html.escape(r.get("qty_note", "").strip() or "-")
+                raw_who = r.get("assigned", "").strip()
+                if not raw_who or raw_who in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"]:
+                    who_html = '<span style="color:#94a3b8; font-style:italic;">Chưa có người góp</span>'
+                else:
+                    who_html = f'<span style="color:#38bdf8; font-weight:700;">🙋‍♂️ {html.escape(raw_who)}</span>'
 
-                row_h = calc_box_height([(task_val, 17), (note_val, 23), (clean_who, 15)])
+                rows_html += f'<tr style="border-bottom:1px solid #334155;"><td style="padding:10px 8px; text-align:center; white-space:nowrap;">{status_badge}</td><td style="padding:10px 8px; font-weight:700; color:#ffffff;">{task_txt}</td><td style="padding:10px 8px; color:#fde68a; font-size:13px;">{note_txt}</td><td style="padding:10px 8px; font-size:13px;">{who_html}</td></tr>'
 
-                c_chk, c_task, c_note, c_who, c_btn = st.columns([0.4, 1.65, 2.05, 1.45, 1.35])
+            table_html = f"""
+            <div style="background:#0f172a; border:1px solid {border_col}; border-radius:12px; overflow:hidden; margin-top:14px; margin-bottom:10px;">
+                <div style="background:{bg_grad}; padding:10px 14px; font-weight:800; color:{txt_col}; font-size:15px; border-bottom:1px solid {border_col};">
+                    {html.escape(cat_title)} ({len(cat_indices)} mục)
+                </div>
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; text-align:left; font-size:14px;">
+                        <thead>
+                            <tr style="background:#1e293b; color:#cbd5e1; font-size:12px; text-transform:uppercase; border-bottom:1px solid #334155;">
+                                <th style="padding:8px; text-align:center; width:15%;">Trạng thái</th>
+                                <th style="padding:8px; width:25%;">Vật dụng</th>
+                                <th style="padding:8px; width:35%;">SL / Ghi chú</th>
+                                <th style="padding:8px; width:25%;">Người góp</th>
+                            </tr>
+                        </thead>
+                        <tbody>{rows_html}</tbody>
+                    </table>
+                </div>
+            </div>
+            """
+            st.markdown(table_html, unsafe_allow_html=True)
 
-                with c_chk:
-                    new_done = st.checkbox("", value=is_done, key=f"tbl_done_{cur_trip}_{i}", label_visibility="collapsed")
-                    if new_done != is_done:
-                        load_cloud.clear()
-                        current_db = load_cloud()
-                        t_reqs = current_db["trips"][cur_trip]["requirements"]
-                        if i < len(t_reqs):
-                            t_reqs[i]["done"] = new_done
-                            status_txt = "đã xong" if new_done else "chưa xong"
-                            add_log(current_db, f"✅ **{me}** đánh dấu **{t_reqs[i]['task']}** ({status_txt}) trong *{cur_trip}*.")
-                            if save_cloud(current_db):
-                                st.rerun()
+            with st.expander(f"🛠️ Thao tác / Đăng ký góp đồ cho bảng: {cat_title}", expanded=False):
+                for i in cat_indices:
+                    req = reqs[i]
+                    cur_assigned = req.get("assigned", "").strip()
+                    contributors = [x.strip() for x in cur_assigned.split(",") if x.strip() and x.strip() not in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"]]
+                    already_joined = (me in contributors)
 
-                with c_task:
-                    st.text_area("Vật dụng", value=task_val, height=row_h, placeholder="Tên vật dụng...", key=f"tbl_task_{cur_trip}_{i}", label_visibility="collapsed")
+                    if can_manage_req:
+                        c_chk, c_lbl, c_btn, c_del = st.columns([0.5, 3.2, 1.5, 0.8])
+                    else:
+                        c_lbl, c_btn = st.columns([3.8, 1.5])
 
-                with c_note:
-                    st.text_area("Ghi chú", value=note_val, height=row_h, placeholder="SL / Ghi chú...", key=f"tbl_note_{cur_trip}_{i}", label_visibility="collapsed")
+                    if can_manage_req:
+                        with c_chk:
+                            chk = st.checkbox("", value=req.get("done", False), key=f"req_chk_{cur_trip}_{i}", label_visibility="collapsed")
+                            if chk != req.get("done", False):
+                                load_cloud.clear()
+                                current_db = load_cloud()
+                                t_reqs = current_db["trips"][cur_trip]["requirements"]
+                                if i < len(t_reqs):
+                                    t_reqs[i]["done"] = chk
+                                    status_txt = "đã xong" if chk else "chưa xong"
+                                    add_log(current_db, f"✅ **{me}** đánh dấu **{t_reqs[i]['task']}** ({status_txt}) trong *{cur_trip}*.")
+                                    if save_cloud(current_db):
+                                        st.rerun()
 
-                with c_who:
-                    st.text_area("Người góp", value=clean_who, height=row_h, placeholder="Chưa ai góp...", key=f"tbl_who_{cur_trip}_{i}", label_visibility="collapsed")
-                with c_btn:
-                    b_g1, b_g2 = st.columns([2.2, 1])
-                    with b_g1:
+                    with c_lbl:
+                        who_preview = ", ".join(contributors) if contributors else "Chưa có người góp"
+                        st.markdown(f"**{html.escape(req['task'])}** — *(Góp: {html.escape(who_preview)})*")
+
+                    with c_btn:
                         if already_joined:
-                            if st.button("↩️ Hủy", key=f"tbl_leave_{cur_trip}_{i}", use_container_width=True):
+                            if st.button("↩️ Hủy góp", key=f"req_leave_{cur_trip}_{i}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_reqs = current_db["trips"][cur_trip]["requirements"]
                                 if i < len(t_reqs):
                                     contributors.remove(me)
-                                    t_reqs[i]["assigned"] = ", ".join(contributors)
+                                    t_reqs[i]["assigned"] = ", ".join(contributors) if contributors else "Chưa có người góp"
                                     add_log(current_db, f"↩️ **{me}** đã rút tên khỏi mục **{t_reqs[i]['task']}** (*{cur_trip}*).")
                                     if save_cloud(current_db):
                                         st.rerun()
                         else:
-                            if st.button("🙋‍♂️ Góp", key=f"tbl_join_{cur_trip}_{i}", use_container_width=True):
+                            if st.button("🙋‍♂️ Tôi góp", key=f"req_join_{cur_trip}_{i}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_reqs = current_db["trips"][cur_trip]["requirements"]
@@ -852,60 +795,20 @@ with t_req:
                                     add_log(current_db, f"🙋‍♂️ **{me}** đã đăng ký góp **{t_reqs[i]['task']}** (*{cur_trip}*).")
                                     if save_cloud(current_db):
                                         st.rerun()
-                    with b_g2:
-                        if st.button("🗑️", key=f"tbl_del_{cur_trip}_{i}", use_container_width=True):
-                            load_cloud.clear()
-                            current_db = load_cloud()
-                            t_reqs = current_db["trips"][cur_trip]["requirements"]
-                            if i < len(t_reqs):
-                                del_name = t_reqs[i].get("task", "mục trống")
-                                t_reqs.pop(i)
-                                add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_name}** (*{cur_trip}*).")
-                                if save_cloud(current_db):
-                                    st.rerun()
 
-                if extra_cols:
-                    ec_cols = st.columns(len(extra_cols))
-                    for ec_i, ec_name in enumerate(extra_cols):
-                        with ec_cols[ec_i]:
-                            ec_val = str(req.get(ec_name, ""))
-                            ec_h = calc_box_height([(ec_val, 35)])
-                            st.text_area(ec_name, value=ec_val, height=ec_h, placeholder=f"{ec_name}...", key=f"tbl_ec_{cur_trip}_{i}_{ec_name}")
+                    if can_manage_req:
+                        with c_del:
+                            if st.button("🗑️", key=f"req_del_{cur_trip}_{i}", use_container_width=True):
+                                load_cloud.clear()
+                                current_db = load_cloud()
+                                t_reqs = current_db["trips"][cur_trip]["requirements"]
+                                if i < len(t_reqs):
+                                    del_task = t_reqs[i]["task"]
+                                    t_reqs.pop(i)
+                                    add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_task}** (*{cur_trip}*).")
+                                    if save_cloud(current_db):
+                                        st.rerun()
 
-                st.markdown('<div style="border-bottom:1px solid #1e293b; margin:2px 0 6px 0;"></div>', unsafe_allow_html=True)
-
-        foot_c1, foot_c2 = st.columns(2)
-        with foot_c1:
-            if st.button("➕ Thêm hàng vào bảng này", key=f"add_row_cat_{cat_idx}", use_container_width=True):
-                load_cloud.clear()
-                current_db = load_cloud()
-                blank_item = {"category": cat_title, "task": "Mục mới (bấm để sửa)", "qty_note": "", "assigned": "", "done": False}
-                for ec in extra_cols:
-                    blank_item[ec] = ""
-                current_db["trips"][cur_trip]["requirements"].append(blank_item)
-                if save_cloud(current_db):
-                    st.rerun()
-        with foot_c2:
-            if cat_indices:
-                if st.button("💾 Lưu chữ đã sửa ở bảng này", key=f"save_cat_{cat_idx}", use_container_width=True):
-                    load_cloud.clear()
-                    current_db = load_cloud()
-                    t_reqs = current_db["trips"][cur_trip]["requirements"]
-                    for i in cat_indices:
-                        if i < len(t_reqs):
-                            new_t = st.session_state.get(f"tbl_task_{cur_trip}_{i}", t_reqs[i].get("task", "")).strip()
-                            new_n = st.session_state.get(f"tbl_note_{cur_trip}_{i}", t_reqs[i].get("qty_note", "")).strip()
-                            new_w = st.session_state.get(f"tbl_who_{cur_trip}_{i}", t_reqs[i].get("assigned", "")).strip()
-                            if new_t:
-                                t_reqs[i]["task"] = new_t
-                            t_reqs[i]["qty_note"] = new_n
-                            t_reqs[i]["assigned"] = new_w
-                            for ec in extra_cols:
-                                t_reqs[i][ec] = st.session_state.get(f"tbl_ec_{cur_trip}_{i}_{ec}", t_reqs[i].get(ec, "")).strip()
-                    add_log(current_db, f"✏️ **{me}** đã cập nhật nội dung bảng **{cat_title}** (*{cur_trip}*).")
-                    if save_cloud(current_db):
-                        st.success("Đã lưu thay đổi!")
-                        st.rerun()
 with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
