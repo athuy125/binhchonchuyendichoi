@@ -167,7 +167,7 @@ def save_cloud(data: dict) -> bool:
         st.error(f"Lỗi mạng: {e}")
         return False
 
-cookie_manager = stx.CookieManager(key="team_auth_cookie_v19")
+cookie_manager = stx.CookieManager(key="team_auth_cookie_v20")
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -180,7 +180,7 @@ db = load_cloud()
 
 if st.session_state.user is None:
     url_tk = st.query_params.get("token", "")
-    ck_tk = cookie_manager.get("team_trip_session_v19")
+    ck_tk = cookie_manager.get("team_trip_session_v20")
     found_tk = ck_tk or url_tk
 
     if found_tk and found_tk in db.get("sessions", {}):
@@ -191,7 +191,7 @@ if st.session_state.user is None:
             if st.query_params.get("token", "") != found_tk:
                 st.query_params["token"] = found_tk
             exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-            cookie_manager.set("team_trip_session_v19", found_tk, expires_at=exp_d)
+            cookie_manager.set("team_trip_session_v20", found_tk, expires_at=exp_d)
             st.rerun()
     elif not url_tk:
         components.html(
@@ -236,7 +236,7 @@ if st.session_state.user is None:
                         fresh_db.setdefault("sessions", {})[new_tk] = name
                         save_cloud(fresh_db)
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_v19", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_v20", new_tk, expires_at=exp_date)
                         st.query_params["token"] = new_tk
                         st.session_state.active_token = new_tk
                         st.session_state.user = name
@@ -264,7 +264,7 @@ if st.session_state.user is None:
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = r_name
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_v19", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_v20", new_tk, expires_at=exp_date)
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.query_params["token"] = new_tk
@@ -281,7 +281,7 @@ is_admin = (me.strip().lower() == "athuy125")
 granted_admins = [u.strip().lower() for u in db.get("config", {}).get("granted_admins", [])]
 has_power = is_admin or (me.strip().lower() in granted_admins)
 
-cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_v19")
+cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_v20")
 if cur_session_tk:
     if st.query_params.get("token", "") != cur_session_tk:
         st.query_params["token"] = cur_session_tk
@@ -297,7 +297,7 @@ if cur_session_tk:
     )
     if not st.session_state.get("cookie_refreshed"):
         exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-        cookie_manager.set("team_trip_session_v19", cur_session_tk, expires_at=exp_d)
+        cookie_manager.set("team_trip_session_v20", cur_session_tk, expires_at=exp_d)
         st.session_state.cookie_refreshed = True
 
 need_deadline_save = False
@@ -343,7 +343,7 @@ with col_c:
                 del clean_db["sessions"][cur_session_tk]
                 save_cloud(clean_db)
             try:
-                cookie_manager.delete("team_trip_session_v19")
+                cookie_manager.delete("team_trip_session_v20")
             except Exception:
                 pass
         components.html(
@@ -569,7 +569,6 @@ st.markdown(
     f'<div style="background:linear-gradient(90deg, #059669, #2563eb); border-radius:12px; padding:12px 16px; margin-bottom:12px; font-size:19px; font-weight:800; color:#ffffff !important; text-align:center;">⛺ {html.escape(cur_trip.upper())}</div>',
     unsafe_allow_html=True,
 )
-
 t_loc, t_food, t_req, t_mem, t_info = st.tabs([
     "🗳️ Bình Chọn Địa Điểm",
     "🍽️ Bình Chọn Thức Ăn",
@@ -577,7 +576,6 @@ t_loc, t_food, t_req, t_mem, t_info = st.tabs([
     "👥 Thành Viên",
     "📋 Thông Tin & Lịch Trình",
 ])
-
 
 with t_loc:
     dl_str = trip_data.get("vote_deadline", "")
@@ -1106,6 +1104,94 @@ with t_req:
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_mem:
+    all_members = list(db["users"].keys())
+    st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
+
+    if is_admin:
+        with st.container(border=True):
+            st.markdown("👑 **Cấp Quyền Sửa Đổi & Đổi Ảnh (Bí mật — Không gửi thông báo):**")
+            other_members = [m for m in all_members if m.strip().lower() != "athuy125"]
+            cur_granted = db.get("config", {}).get("granted_admins", [])
+
+            if other_members:
+                g_col1, g_col2, g_col3 = st.columns([2.8, 1.3, 1.3])
+                with g_col1:
+                    grant_target = st.selectbox("Chọn thành viên cấp quyền", other_members, key="grant_sel_box", label_visibility="collapsed")
+                with g_col2:
+                    if st.button("✅ Cấp quyền", key="btn_grant_perm", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        cfg = current_db.setdefault("config", {})
+                        g_list = cfg.setdefault("granted_admins", [])
+                        if grant_target not in g_list:
+                            g_list.append(grant_target)
+                            if save_cloud(current_db):
+                                st.success(f"Đã bí mật cấp quyền cho {grant_target}!")
+                                st.rerun()
+                        else:
+                            st.info(f"{grant_target} đã có quyền rồi.")
+                with g_col3:
+                    if st.button("🚫 Gỡ quyền", key="btn_revoke_perm", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        cfg = current_db.setdefault("config", {})
+                        g_list = cfg.get("granted_admins", [])
+                        if grant_target in g_list:
+                            g_list.remove(grant_target)
+                            if save_cloud(current_db):
+                                st.warning(f"Đã gỡ quyền của {grant_target}.")
+                                st.rerun()
+
+                if cur_granted:
+                    st.caption(f"🛡️ **Đang có quyền quản trị phụ:** {', '.join(cur_granted)}")
+                else:
+                    st.caption("🛡️ Chưa cấp quyền cho thành viên nào.")
+            else:
+                st.caption("Chưa có thành viên nào khác để cấp quyền.")
+        with st.container(border=True):
+            st.markdown("⚙️ **Quản lý danh sách thành viên:**")
+            deletable_members = [m for m in all_members if m != me]
+            if deletable_members:
+                c_sel, c_btn = st.columns([3.5, 1.5])
+                with c_sel:
+                    target_user = st.selectbox("Chọn tên", deletable_members, label_visibility="collapsed")
+                with c_btn:
+                    if st.button("🗑️ Xóa", key="admin_del_btn", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        if target_user in current_db["users"]:
+                            del current_db["users"][target_user]
+                        for tr in current_db["trips"].values():
+                            for loc in tr.get("locations", []):
+                                if target_user in loc.get("voters", []):
+                                    loc["voters"].remove(target_user)
+                        add_log(current_db, f"👋 Thành viên **{target_user}** đã rời khỏi danh sách đội.")
+                        if save_cloud(current_db):
+                            st.success(f"Đã xóa {target_user}!")
+                            st.rerun()
+            else:
+                st.caption("Không có thành viên nào khác để xóa.")
+
+    if len(all_members) == 0:
+        st.info("Chưa có thành viên nào đăng ký.")
+    else:
+        cur_granted_lower = [u.strip().lower() for u in db.get("config", {}).get("granted_admins", [])]
+        for idx, member_name in enumerate(all_members, start=1):
+            role_tag = ""
+            if member_name.strip().lower() == "athuy125":
+                role_tag = ' <span style="background:#78350f; color:#fbbf24; padding:2px 8px; border-radius:8px; font-size:11px; margin-left:6px;">👑 Trưởng nhóm</span>'
+            elif is_admin and member_name.strip().lower() in cur_granted_lower:
+                role_tag = ' <span style="background:#064e3b; color:#34d399; padding:2px 8px; border-radius:8px; font-size:11px; margin-left:6px;">🛡️ Được cấp quyền</span>'
+
+            voted_places = [loc["name"] for loc in locs if member_name in loc.get("voters", [])]
+            vote_status = f"✅ Địa điểm: {', '.join(voted_places)}" if voted_places else "⏳ Chưa chọn địa điểm"
+            voted_foods = [f["name"] for f in foods if member_name in f.get("voters", [])]
+            food_status = f"🍽️ Món ăn ({len(voted_foods)}): {', '.join(voted_foods)}" if voted_foods else "🍴 Chưa chọn món"
+            assigned_tasks = [req["task"] for req in reqs if member_name in req.get("assigned", "")]
+            task_status = f"🎒 Góp đồ ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ"
+
+            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}{role_tag}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
+            st.markdown(card_html, unsafe_allow_html=True)
 with t_info:
     raw_desc = trip_data.get("desc", "").strip() or "Chưa có thông tin chi tiết cho chuyến đi này."
     safe_desc = html.escape(raw_desc)
