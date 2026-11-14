@@ -295,7 +295,8 @@ if st.session_state.user is None:
 db = load_cloud()
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
-
+granted_admins = [u.strip().lower() for u in db.get("config", {}).get("granted_admins", [])]
+has_power = is_admin or (me.strip().lower() in granted_admins)
 cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_lq")
 if cur_session_tk:
     if st.query_params.get("token", "") != cur_session_tk:
@@ -771,23 +772,25 @@ with t_loc:
                                 if save_cloud(current_db):
                                     st.rerun()
 
-                    with st.expander("🖼️ Đổi ảnh / Sửa điểm"):
-                        with st.form(f"edit_loc_{cur_trip}_{i}"):
-                            el_name = st.text_input("Tên địa điểm", value=loc.get("name", ""))
-                            el_desc = st.text_input("Mô tả", value=loc.get("desc", ""))
-                            el_img = st.text_input("Link ảnh mới (https://...)", value=loc.get("img", ""))
-                            if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
-                                load_cloud.clear()
-                                current_db = load_cloud()
-                                t_locs = current_db["trips"][cur_trip]["locations"]
-                                if i < len(t_locs):
-                                    if el_name.strip():
-                                        t_locs[i]["name"] = el_name.strip()
-                                    t_locs[i]["desc"] = el_desc.strip()
-                                    if el_img.strip().startswith("http"):
-                                        t_locs[i]["img"] = el_img.strip()
-                                    if save_cloud(current_db):
-                                        st.rerun()
+                                        if has_power:
+                        with st.expander("🖼️ Đổi ảnh / Sửa điểm"):
+                            with st.form(f"edit_loc_{cur_trip}_{i}"):
+                                el_name = st.text_input("Tên địa điểm", value=loc.get("name", ""))
+                                el_desc = st.text_input("Mô tả", value=loc.get("desc", ""))
+                                el_img = st.text_input("Link ảnh mới (https://...)", value=loc.get("img", ""))
+                                if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
+                                    load_cloud.clear()
+                                    current_db = load_cloud()
+                                    t_locs = current_db["trips"][cur_trip]["locations"]
+                                    if i < len(t_locs):
+                                        if el_name.strip():
+                                            t_locs[i]["name"] = el_name.strip()
+                                        t_locs[i]["desc"] = el_desc.strip()
+                                        if el_img.strip().startswith("http"):
+                                            t_locs[i]["img"] = el_img.strip()
+                                        if save_cloud(current_db):
+                                            st.rerun()
+
 
                     st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_food:
@@ -922,23 +925,25 @@ with t_food:
                                     if save_cloud(current_db):
                                         st.rerun()
 
-                        with st.expander("🖼️ Đổi ảnh / Sửa món"):
-                            with st.form(f"edit_food_{cur_trip}_{idx_f}"):
-                                ef_name = st.text_input("Tên món", value=f_item.get("name", ""))
-                                ef_note = st.text_input("Giá / Ghi chú", value=f_item.get("note", ""))
-                                ef_img = st.text_input("Link ảnh mới (https://...)", value=f_item.get("img", ""))
-                                if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
-                                    load_cloud.clear()
-                                    current_db = load_cloud()
-                                    cur_foods = current_db["trips"][cur_trip].get("foods", [])
-                                    if idx_f < len(cur_foods):
-                                        if ef_name.strip():
-                                            cur_foods[idx_f]["name"] = ef_name.strip()
-                                        cur_foods[idx_f]["note"] = ef_note.strip()
-                                        if ef_img.strip().startswith("http"):
-                                            cur_foods[idx_f]["img"] = ef_img.strip()
-                                        if save_cloud(current_db):
-                                            st.rerun()
+                                                if has_power:
+                            with st.expander("🖼️ Đổi ảnh / Sửa món"):
+                                with st.form(f"edit_food_{cur_trip}_{idx_f}"):
+                                    ef_name = st.text_input("Tên món", value=f_item.get("name", ""))
+                                    ef_note = st.text_input("Giá / Ghi chú", value=f_item.get("note", ""))
+                                    ef_img = st.text_input("Link ảnh mới (https://...)", value=f_item.get("img", ""))
+                                    if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
+                                        load_cloud.clear()
+                                        current_db = load_cloud()
+                                        cur_foods = current_db["trips"][cur_trip].get("foods", [])
+                                        if idx_f < len(cur_foods):
+                                            if ef_name.strip():
+                                                cur_foods[idx_f]["name"] = ef_name.strip()
+                                            cur_foods[idx_f]["note"] = ef_note.strip()
+                                            if ef_img.strip().startswith("http"):
+                                                cur_foods[idx_f]["img"] = ef_img.strip()
+                                            if save_cloud(current_db):
+                                                st.rerun()
+
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_req:
@@ -1117,24 +1122,25 @@ with t_req:
                                         add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_t}** (*{cur_trip}*).")
                                         if save_cloud(current_db):
                                             st.rerun()
-                        with st.expander("🖼️ Gắn ảnh / Sửa mục"):
-                            with st.form(f"edit_req_{cur_trip}_{i}"):
-                                er_task = st.text_input("Tên đồ dùng", value=req.get("task", ""))
-                                er_note = st.text_input("SL / Ghi chú", value=req.get("qty_note", ""))
-                                er_img = st.text_input("Link ảnh (https://...)", value=req.get("img", ""))
-                                if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
-                                    load_cloud.clear()
-                                    current_db = load_cloud()
-                                    t_reqs = current_db["trips"][cur_trip]["requirements"]
-                                    if i < len(t_reqs):
-                                        if er_task.strip():
-                                            t_reqs[i]["task"] = er_task.strip()
-                                        t_reqs[i]["qty_note"] = er_note.strip()
-                                        if er_img.strip().startswith("http"):
-                                            t_reqs[i]["img"] = er_img.strip()
-                                        add_log(current_db, f"🖼️ **{me}** đã cập nhật **{t_reqs[i]['task']}**.")
-                                        if save_cloud(current_db):
-                                            st.rerun()
+                                                if has_power:
+                            with st.expander("🖼️ Gắn ảnh / Sửa mục"):
+                                with st.form(f"edit_req_{cur_trip}_{i}"):
+                                    er_task = st.text_input("Tên đồ dùng", value=req.get("task", ""))
+                                    er_note = st.text_input("SL / Ghi chú", value=req.get("qty_note", ""))
+                                    er_img = st.text_input("Link ảnh (https://...)", value=req.get("img", ""))
+                                    if st.form_submit_button("💾 Lưu cập nhật", use_container_width=True):
+                                        load_cloud.clear()
+                                        current_db = load_cloud()
+                                        t_reqs = current_db["trips"][cur_trip]["requirements"]
+                                        if i < len(t_reqs):
+                                            if er_task.strip():
+                                                t_reqs[i]["task"] = er_task.strip()
+                                            t_reqs[i]["qty_note"] = er_note.strip()
+                                            if er_img.strip().startswith("http"):
+                                                t_reqs[i]["img"] = er_img.strip()
+                                            add_log(current_db, f"🖼️ **{me}** đã cập nhật **{t_reqs[i]['task']}**.")
+                                            if save_cloud(current_db):
+                                                st.rerun()
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_mem:
@@ -1142,6 +1148,48 @@ with t_mem:
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
 
     if is_admin:
+        with st.container(border=True):
+            st.markdown("👑 **Cấp Quyền Sửa Đổi & Đổi Ảnh (Bí mật — Không gửi thông báo):**")
+            other_members = [m for m in all_members if m.strip().lower() != "athuy125"]
+            cur_granted = db.get("config", {}).get("granted_admins", [])
+
+            if other_members:
+                g_col1, g_col2, g_col3 = st.columns([2.8, 1.3, 1.3])
+                with g_col1:
+                    grant_target = st.selectbox("Chọn thành viên cấp quyền", other_members, key="grant_sel_box", label_visibility="collapsed")
+                with g_col2:
+                    if st.button("✅ Cấp quyền", key="btn_grant_perm", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        cfg = current_db.setdefault("config", {})
+                        g_list = cfg.setdefault("granted_admins", [])
+                        if grant_target not in g_list:
+                            g_list.append(grant_target)
+                            # Lưu trực tiếp không gọi add_log để không hiện thông báo chung
+                            if save_cloud(current_db):
+                                st.success(f"Đã bí mật cấp quyền cho {grant_target}!")
+                                st.rerun()
+                        else:
+                            st.info(f"{grant_target} đã có quyền rồi.")
+                with g_col3:
+                    if st.button("🚫 Gỡ quyền", key="btn_revoke_perm", use_container_width=True):
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        cfg = current_db.setdefault("config", {})
+                        g_list = cfg.get("granted_admins", [])
+                        if grant_target in g_list:
+                            g_list.remove(grant_target)
+                            if save_cloud(current_db):
+                                st.warning(f"Đã gỡ quyền của {grant_target}.")
+                                st.rerun()
+
+                if cur_granted:
+                    st.caption(f"🛡️ **Đang có quyền quản trị phụ:** {', '.join(cur_granted)}")
+                else:
+                    st.caption("🛡️ Chưa cấp quyền cho thành viên nào.")
+            else:
+                st.caption("Chưa có thành viên nào khác để cấp quyền.")
+
         with st.container(border=True):
             st.markdown("⚙️ **Quản lý danh sách thành viên:**")
             deletable_members = [m for m in all_members if m != me]
@@ -1169,7 +1217,14 @@ with t_mem:
     if len(all_members) == 0:
         st.info("Chưa có thành viên nào đăng ký.")
     else:
+        cur_granted_lower = [u.strip().lower() for u in db.get("config", {}).get("granted_admins", [])]
         for idx, member_name in enumerate(all_members, start=1):
+            role_tag = ""
+            if member_name.strip().lower() == "athuy125":
+                role_tag = ' <span style="background:#78350f; color:#fbbf24; padding:2px 8px; border-radius:8px; font-size:11px; margin-left:6px;">👑 Trưởng nhóm</span>'
+            elif is_admin and member_name.strip().lower() in cur_granted_lower:
+                role_tag = ' <span style="background:#064e3b; color:#34d399; padding:2px 8px; border-radius:8px; font-size:11px; margin-left:6px;">🛡️ Được cấp quyền</span>'
+
             voted_places = [loc["name"] for loc in locs if member_name in loc.get("voters", [])]
             vote_status = f"✅ Địa điểm: {', '.join(voted_places)}" if voted_places else "⏳ Chưa chọn địa điểm"
             voted_foods = [f["name"] for f in foods if member_name in f.get("voters", [])]
@@ -1177,5 +1232,5 @@ with t_mem:
             assigned_tasks = [req["task"] for req in reqs if member_name in req.get("assigned", "")]
             task_status = f"🎒 Góp đồ ({len(assigned_tasks)}): {', '.join(assigned_tasks)}" if assigned_tasks else "📋 Chưa nhận đồ"
 
-            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
+            card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}{role_tag}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
             st.markdown(card_html, unsafe_allow_html=True)
