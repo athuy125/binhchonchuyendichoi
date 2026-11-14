@@ -52,10 +52,16 @@ div.stButton > button {
     font-weight: 600 !important;
     padding: 4px 8px !important;
 }
-div.stButton > button:hover {
-    background-color: #2563eb !important;
+div.stButton > button {
+    background-color: #1e293b !important;
     color: #ffffff !important;
+    border: 1px solid #3b82f6 !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    padding: 4px 10px !important;
+    white-space: nowrap !important;
 }
+
 button[kind="primaryFormSubmit"], [data-testid="stFormSubmitButton"] > button {
     background: linear-gradient(135deg, #059669 0%, #2563eb 100%) !important;
     color: #ffffff !important;
