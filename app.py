@@ -18,19 +18,61 @@ HEADERS = {"Content-Type": "application/json", "X-Master-Key": MASTER_KEY}
 
 CSS_STYLE = """
 <style>
-.stApp { background-color: #0b1120; color: #f8fafc; }
-.hero-banner { background: linear-gradient(135deg, #059669 0%, #2563eb 100%); border-radius: 16px; padding: 22px; margin-bottom: 16px; color: #ffffff; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); }
-.notice-board { background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid #f59e0b; border-left: 6px solid #f59e0b; border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; box-shadow: 0 6px 18px rgba(245, 158, 11, 0.18); }
-.notice-title { color: #fbbf24; font-size: 14px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 8px; text-transform: uppercase; }
-.notice-body { color: #f8fafc; font-size: 16px; line-height: 1.6; white-space: pre-line; }
-.trip-card { background: linear-gradient(145deg, #1e293b, #0f172a); border: 1px solid #3b82f6; border-radius: 14px; padding: 20px; margin-bottom: 12px; }
-.vote-badge { display: inline-block; background-color: #064e3b; color: #34d399; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
-.member-card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
-div.stButton > button { border-radius: 10px; font-weight: 600; }
+html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"], .stApp {
+    background-color: #090d16 !important;
+    color: #ffffff !important;
+}
+[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stSidebar"] {
+    background-color: #090d16 !important;
+    color: #ffffff !important;
+}
+h1, h2, h3, h4, h5, h6, p, span, label, li, div, .stMarkdown {
+    color: #ffffff !important;
+}
+input, textarea, select, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea, [data-baseweb="select"] > div {
+    background-color: #161f33 !important;
+    color: #ffffff !important;
+    border: 1px solid #334155 !important;
+    -webkit-text-fill-color: #ffffff !important;
+}
+input::placeholder, textarea::placeholder {
+    color: #94a3b8 !important;
+    -webkit-text-fill-color: #94a3b8 !important;
+}
+[data-testid="stExpander"], [data-testid="stForm"], [data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #111827 !important;
+    border-color: #263248 !important;
+    color: #ffffff !important;
+}
+div.stButton > button {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    border: 1px solid #3b82f6 !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+}
+div.stButton > button:hover {
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+}
+button[kind="primaryFormSubmit"], [data-testid="stFormSubmitButton"] > button {
+    background: linear-gradient(135deg, #059669 0%, #2563eb 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+.hero-banner { background: linear-gradient(135deg, #059669 0%, #2563eb 100%); border-radius: 16px; padding: 22px; margin-bottom: 16px; color: #ffffff !important; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5); }
+.notice-board { background: linear-gradient(145deg, #161f33, #0d1322); border: 1px solid #f59e0b; border-left: 6px solid #f59e0b; border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; }
+.notice-title { color: #fbbf24 !important; font-size: 14px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 8px; text-transform: uppercase; }
+.notice-body { color: #ffffff !important; font-size: 16px; line-height: 1.6; white-space: pre-line; }
+.trip-card { background: linear-gradient(145deg, #161f33, #0d1322); border: 1px solid #3b82f6; border-radius: 14px; padding: 20px; margin-bottom: 12px; }
+.vote-badge { display: inline-block; background-color: #064e3b; color: #34d399 !important; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.member-card { background-color: #161f33; border: 1px solid #334155; border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }
+.notif-row { background-color: #131b2e; border: 1px solid #263248; border-left: 4px solid #38bdf8; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+.notif-row-vip { background-color: #1c1917; border: 1px solid #f59e0b; border-left: 4px solid #f59e0b; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+.tbl-header { background: linear-gradient(90deg, #1e3a8a, #0f172a); border: 1px solid #3b82f6; border-radius: 10px; padding: 10px 14px; font-weight: 800; color: #93c5fd !important; font-size: 15px; margin-top: 14px; margin-bottom: 8px; }
 </style>
 """
 st.markdown(CSS_STYLE, unsafe_allow_html=True)
-
 def now_vn() -> datetime.datetime:
     return datetime.datetime.utcnow() + datetime.timedelta(hours=7)
 
@@ -83,6 +125,7 @@ def trigger_browser_push(notif_item):
     </script>
     """
     components.html(js_code, height=0)
+
 @st.cache_data(ttl=10, show_spinner=False)
 def load_cloud() -> dict:
     default = {"users": {}, "sessions": {}, "trips": {}, "notifications": [], "config": {}}
@@ -126,22 +169,32 @@ def save_cloud(data: dict) -> bool:
     except Exception as e:
         st.error(f"Lỗi mạng: {e}")
         return False
-
-cookie_manager = stx.CookieManager(key="team_auth_cookie")
+cookie_manager = stx.CookieManager(key="team_auth_cookie_v3")
 
 if "user" not in st.session_state:
     st.session_state.user = None
 if "selected_trip" not in st.session_state:
     st.session_state.selected_trip = None
+if "active_token" not in st.session_state:
+    st.session_state.active_token = ""
 
 db = load_cloud()
 
 if st.session_state.user is None:
-    cookie_token = cookie_manager.get("team_trip_session")
-    if cookie_token and cookie_token in db.get("sessions", {}):
-        auto_user = db["sessions"][cookie_token]
+    url_tk = st.query_params.get("token", "")
+    ck_tk = cookie_manager.get("team_trip_session_v3")
+    found_tk = ck_tk or url_tk
+
+    if found_tk and found_tk in db.get("sessions", {}):
+        auto_user = db["sessions"][found_tk]
         if auto_user in db.get("users", {}):
             st.session_state.user = auto_user
+            st.session_state.active_token = found_tk
+            if st.query_params.get("token", "") != found_tk:
+                st.query_params["token"] = found_tk
+            if not ck_tk:
+                exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
+                cookie_manager.set("team_trip_session_v3", found_tk, expires_at=exp_d)
             st.rerun()
 if st.session_state.user is None:
     AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
@@ -152,7 +205,7 @@ if st.session_state.user is None:
         with st.form("login_box"):
             name = st.text_input("Tên của bạn", placeholder="Nhập tên đã đăng ký...").strip()
             pwd = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
-            remember_in = st.checkbox("💾 Ghi nhớ đăng nhập vĩnh viễn trên thiết bị này", value=True)
+            st.caption("🔒 Hệ thống tự động ghi nhớ đăng nhập vĩnh viễn trên thiết bị này sau khi vào.")
             if st.form_submit_button("🚀 Vào Hệ Thống", use_container_width=True):
                 if not name or not pwd:
                     st.warning("Vui lòng nhập đủ tên và mật khẩu!")
@@ -164,14 +217,15 @@ if st.session_state.user is None:
                     elif fresh_db["users"][name] != make_hash(pwd):
                         st.error("Mật khẩu không đúng!")
                     else:
-                        if remember_in:
-                            new_tk = secrets.token_hex(16)
-                            fresh_db.setdefault("sessions", {})[new_tk] = name
-                            save_cloud(fresh_db)
-                            exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                            cookie_manager.set("team_trip_session", new_tk, expires_at=exp_date)
-                            time.sleep(0.5)
+                        new_tk = secrets.token_hex(16)
+                        fresh_db.setdefault("sessions", {})[new_tk] = name
+                        save_cloud(fresh_db)
+                        exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
+                        cookie_manager.set("team_trip_session_v3", new_tk, expires_at=exp_date)
+                        st.query_params["token"] = new_tk
+                        st.session_state.active_token = new_tk
                         st.session_state.user = name
+                        time.sleep(0.8)
                         st.rerun()
 
     with tab2:
@@ -179,7 +233,7 @@ if st.session_state.user is None:
             r_name = st.text_input("Tên hiển thị của bạn", placeholder="Ví dụ: Huy Đỗ...").strip()
             r_pwd = st.text_input("Tạo mật khẩu", type="password")
             r_pwd2 = st.text_input("Nhập lại mật khẩu", type="password")
-            remember_up = st.checkbox("💾 Ghi nhớ đăng nhập vĩnh viễn trên thiết bị này", value=True)
+            st.caption("🔒 Tài khoản sẽ được lưu trực tuyến và tự động ghi nhớ trên thiết bị này.")
             if st.form_submit_button("✅ Đăng Ký & Lưu Online", use_container_width=True):
                 if not r_name or not r_pwd:
                     st.warning("Không được để trống tên hoặc mật khẩu!")
@@ -192,21 +246,31 @@ if st.session_state.user is None:
                         st.error("Tên này đã có người đăng ký rồi!")
                     else:
                         fresh_db["users"][r_name] = make_hash(r_pwd)
-                        if remember_up:
-                            new_tk = secrets.token_hex(16)
-                            fresh_db.setdefault("sessions", {})[new_tk] = r_name
-                            exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                            cookie_manager.set("team_trip_session", new_tk, expires_at=exp_date)
+                        new_tk = secrets.token_hex(16)
+                        fresh_db.setdefault("sessions", {})[new_tk] = r_name
+                        exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
+                        cookie_manager.set("team_trip_session_v3", new_tk, expires_at=exp_date)
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
-                            time.sleep(0.5)
+                            st.query_params["token"] = new_tk
+                            st.session_state.active_token = new_tk
                             st.session_state.user = r_name
+                            time.sleep(0.8)
                             st.success("Đăng ký thành công!")
                             st.rerun()
 
     st.stop()
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
+
+cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_v3")
+if cur_session_tk:
+    if st.query_params.get("token", "") != cur_session_tk:
+        st.query_params["token"] = cur_session_tk
+    if not st.session_state.get("cookie_refreshed"):
+        exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
+        cookie_manager.set("team_trip_session_v3", cur_session_tk, expires_at=exp_d)
+        st.session_state.cookie_refreshed = True
 
 need_deadline_save = False
 for t_key, t_val in db["trips"].items():
@@ -233,44 +297,56 @@ if need_deadline_save:
 
 all_notifs = db.get("notifications", [])
 if all_notifs:
-    trigger_browser_push(all_notifs[0])
+    trigger_browser_push(all_notifs)
 
 col_a, col_b, col_c = st.columns([3.5, 1.3, 1.2])
 with col_a:
-    st.success(f"🟢 Xin chào **{me}**!")
+    st.success(f"🟢 Xin chào **{me}**! *(Đã lưu đăng nhập)*")
 with col_b:
     if st.button("🔄 Làm mới", use_container_width=True):
         load_cloud.clear()
         st.rerun()
 with col_c:
     if st.button("Thoát", use_container_width=True):
-        cur_tk = cookie_manager.get("team_trip_session")
-        if cur_tk:
+        if cur_session_tk:
             load_cloud.clear()
             clean_db = load_cloud()
-            if cur_tk in clean_db.get("sessions", {}):
-                del clean_db["sessions"][cur_tk]
+            if cur_session_tk in clean_db.get("sessions", {}):
+                del clean_db["sessions"][cur_session_tk]
                 save_cloud(clean_db)
-            cookie_manager.delete("team_trip_session")
+            cookie_manager.delete("team_trip_session_v3")
             time.sleep(0.5)
+        st.query_params.clear()
+        st.session_state.active_token = ""
+        st.session_state.cookie_refreshed = False
         st.session_state.user = None
         st.session_state.selected_trip = None
         st.rerun()
 with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đội", expanded=True):
-    components.html(
-        """
-        <button onclick="Notification.requestPermission().then(p => alert(p === 'granted' ? 'Đã bật thông báo trên trình duyệt thành công!' : 'Trình duyệt đang chặn thông báo, hãy bật trong cài đặt trang web.'))"
-        style="background:#2563eb; color:white; border:none; padding:6px 14px; border-radius:8px; font-weight:600; cursor:pointer; font-size:13px;">
-        📲 Bật thông báo trình duyệt
-        </button>
-        """,
-        height=38,
-    )
+    top_n1, top_n2 = st.columns([3.2, 2.2])
+    with top_n1:
+        st.caption("📌 Cập nhật mọi hoạt động mới nhất của anh em trong đội")
+    with top_n2:
+        components.html(
+            """
+            <div style="text-align:right;">
+                <button onclick="Notification.requestPermission().then(p => alert(p === 'granted' ? 'Đã bật thông báo trên máy thành công!' : 'Trình duyệt đang chặn thông báo, hãy bật trong cài đặt trang web.'))"
+                style="background:#2563eb; color:white; border:none; padding:6px 12px; border-radius:8px; font-weight:600; cursor:pointer; font-size:12.5px;">
+                📲 Bật thông báo máy
+                </button>
+            </div>
+            """,
+            height=36,
+        )
 
     if is_admin:
         with st.form("admin_broadcast_form", clear_on_submit=True):
-            b_msg = st.text_input("Soạn thông báo gửi tới tất cả thành viên", placeholder="Nhập nội dung thông báo chung...")
-            if st.form_submit_button("📢 Gửi Thông Báo Cho Cả Đội", use_container_width=True):
+            b_col1, b_col2 = st.columns([4.2, 1.4])
+            with b_col1:
+                b_msg = st.text_input("Soạn thông báo chung", placeholder="Nhập thông báo gửi tới cả đội...", label_visibility="collapsed")
+            with b_col2:
+                send_b = st.form_submit_button("📢 Gửi tin", use_container_width=True)
+            if send_b:
                 if b_msg.strip():
                     load_cloud.clear()
                     current_db = load_cloud()
@@ -281,7 +357,7 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
                 else:
                     st.warning("Vui lòng nhập nội dung thông báo!")
 
-        with st.expander("⚙️ Cài đặt gửi thông báo về điện thoại (Khi tắt web)", expanded=False):
+        with st.expander("⚙️ Cài đặt gửi thông báo về điện thoại (Discord / Telegram)", expanded=False):
             with st.form("webhook_cfg_form"):
                 cur_cfg = db.get("config", {})
                 in_discord = st.text_input("Link Discord Webhook nhóm đội", value=cur_cfg.get("discord_webhook", ""), placeholder="https://discord.com...")
@@ -300,13 +376,19 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
                         st.rerun()
 
     if not all_notifs:
-        st.caption("Chưa có hoạt động nào được ghi nhận.")
+        st.info("Chưa có hoạt động nào được ghi nhận.")
     else:
         for idx_n, n_item in enumerate(all_notifs[:6]):
+            is_vip = n_item.get("important", False)
+            row_cls = "notif-row-vip" if is_vip else "notif-row"
+            time_badge_color = "#fbbf24" if is_vip else "#38bdf8"
+            raw_msg = html.escape(n_item.get("msg", "")).replace("**", "")
+            card_notif = f'<div class="{row_cls}"><span style="color:{time_badge_color}; font-size:12px; font-weight:700;">🕒 {html.escape(n_item.get("time", ""))}</span><div style="color:#ffffff; font-size:14px; margin-top:3px;">{raw_msg}</div></div>'
+
             if is_admin:
                 col_n1, col_n2 = st.columns([5.2, 0.8])
                 with col_n1:
-                    st.markdown(f"- `[{n_item.get('time', '')}]` {n_item.get('msg', '')}")
+                    st.markdown(card_notif, unsafe_allow_html=True)
                 with col_n2:
                     if st.button("🗑️", key=f"del_notif_{idx_n}", use_container_width=True):
                         load_cloud.clear()
@@ -318,7 +400,7 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
                             if save_cloud(current_db):
                                 st.rerun()
             else:
-                st.markdown(f"- `[{n_item.get('time', '')}]` {n_item.get('msg', '')}")
+                st.markdown(card_notif, unsafe_allow_html=True)
 
         if is_admin:
             if st.button("🧹 Xóa tất cả thông báo", key="clear_all_notifs", use_container_width=True):
@@ -605,61 +687,25 @@ with t_req:
             if not cat_indices:
                 continue
 
-            rows_html = ""
+            st.markdown(f'<div class="tbl-header">{html.escape(cat_title)} ({len(cat_indices)} mục)</div>', unsafe_allow_html=True)
+
             for i in cat_indices:
-                r = reqs[i]
-                is_done = r.get("done", False)
-                status_badge = '<span style="background:#064e3b; color:#34d399; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:700;">✅ Đã xong</span>' if is_done else '<span style="background:#334155; color:#fbbf24; padding:3px 8px; border-radius:6px; font-size:12px; font-weight:600;">⏳ Đang lo</span>'
-                task_txt = html.escape(r.get("task", ""))
-                if is_done:
-                    task_txt = f'<span style="text-decoration:line-through; opacity:0.65;">{task_txt}</span>'
-                note_txt = html.escape(r.get("qty_note", "").strip() or "-")
-                raw_who = r.get("assigned", "").strip()
-                if not raw_who or raw_who in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"]:
-                    who_html = '<span style="color:#94a3b8; font-style:italic;">Chưa có người góp</span>'
-                else:
-                    who_html = f'<span style="color:#38bdf8; font-weight:700;">🙋‍♂️ {html.escape(raw_who)}</span>'
+                req = reqs[i]
+                is_done = req.get("done", False)
+                cur_assigned = req.get("assigned", "").strip()
+                contributors = [x.strip() for x in cur_assigned.split(",") if x.strip() and x.strip() not in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"]]
+                already_joined = (me in contributors)
 
-                rows_html += f'<tr style="border-bottom:1px solid #334155;"><td style="padding:10px 8px; text-align:center; white-space:nowrap;">{status_badge}</td><td style="padding:10px 8px; font-weight:700; color:#f8fafc;">{task_txt}</td><td style="padding:10px 8px; color:#cbd5e1; font-size:13px;">{note_txt}</td><td style="padding:10px 8px; font-size:13px;">{who_html}</td></tr>'
-
-            table_html = f"""
-            <div style="background:#0f172a; border:1px solid #3b82f6; border-radius:12px; overflow:hidden; margin-top:14px; margin-bottom:10px;">
-                <div style="background:linear-gradient(90deg, #1e3a8a, #0f172a); padding:10px 14px; font-weight:800; color:#93c5fd; font-size:15px; border-bottom:1px solid #3b82f6;">
-                    {html.escape(cat_title)} ({len(cat_indices)} mục)
-                </div>
-                <div style="overflow-x:auto;">
-                    <table style="width:100%; border-collapse:collapse; text-align:left; font-size:14px;">
-                        <thead>
-                            <tr style="background:#1e293b; color:#94a3b8; font-size:12px; text-transform:uppercase; border-bottom:1px solid #334155;">
-                                <th style="padding:8px; text-align:center; width:15%;">Trạng thái</th>
-                                <th style="padding:8px; width:25%;">Vật dụng</th>
-                                <th style="padding:8px; width:35%;">SL / Ghi chú</th>
-                                <th style="padding:8px; width:25%;">Người góp</th>
-                            </tr>
-                        </thead>
-                        <tbody>{rows_html}</tbody>
-                    </table>
-                </div>
-            </div>
-            """
-            st.markdown(table_html, unsafe_allow_html=True)
-
-            with st.expander(f"🛠️ Thao tác / Đăng ký góp đồ cho bảng: {cat_title}", expanded=False):
-                for i in cat_indices:
-                    req = reqs[i]
-                    cur_assigned = req.get("assigned", "").strip()
-                    contributors = [x.strip() for x in cur_assigned.split(",") if x.strip() and x.strip() not in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"]]
-                    already_joined = (me in contributors)
-
+                with st.container(border=True):
                     if can_manage_req:
-                        c_chk, c_lbl, c_btn, c_del = st.columns([0.5, 3.2, 1.5, 0.8])
+                        col_s, col_m, col_b, col_d = st.columns([0.55, 3.35, 1.45, 0.65])
                     else:
-                        c_lbl, c_btn = st.columns([3.8, 1.5])
+                        col_s, col_m, col_b = st.columns([0.9, 3.6, 1.5])
 
-                    if can_manage_req:
-                        with c_chk:
-                            chk = st.checkbox("", value=req.get("done", False), key=f"req_chk_{cur_trip}_{i}", label_visibility="collapsed")
-                            if chk != req.get("done", False):
+                    with col_s:
+                        if can_manage_req:
+                            chk = st.checkbox("", value=is_done, key=f"req_chk_{cur_trip}_{i}", label_visibility="collapsed")
+                            if chk != is_done:
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_reqs = current_db["trips"][cur_trip]["requirements"]
@@ -669,14 +715,19 @@ with t_req:
                                     add_log(current_db, f"✅ **{me}** đánh dấu **{t_reqs[i]['task']}** ({status_txt}) trong *{cur_trip}*.")
                                     if save_cloud(current_db):
                                         st.rerun()
+                        else:
+                            st.markdown("✅" if is_done else "⏳")
+                    with col_m:
+                        task_style = "text-decoration:line-through; opacity:0.6;" if is_done else "font-weight:700; color:#ffffff;"
+                        who_str = ", ".join(contributors) if contributors else "Chưa có người góp"
+                        who_badge = f'<span style="background:#064e3b; color:#34d399; padding:2px 8px; border-radius:8px; font-size:12px; font-weight:700;">🙋‍♂️ {html.escape(who_str)}</span>' if contributors else '<span style="background:#1e293b; color:#94a3b8; padding:2px 8px; border-radius:8px; font-size:12px;">Chưa có người góp</span>'
+                        note_str = req.get("qty_note", "").strip()
+                        note_html = f'<div style="color:#cbd5e1; font-size:13px; margin-top:4px;">📝 {html.escape(note_str)}</div>' if note_str else ""
+                        st.markdown(f'<div><span style="{task_style} font-size:15px;">{html.escape(req["task"])}</span> &nbsp;{who_badge}{note_html}</div>', unsafe_allow_html=True)
 
-                    with c_lbl:
-                        who_preview = ", ".join(contributors) if contributors else "Chưa có người góp"
-                        st.markdown(f"**{html.escape(req['task'])}** — *(Góp: {html.escape(who_preview)})*")
-
-                    with c_btn:
+                    with col_b:
                         if already_joined:
-                            if st.button("↩️ Hủy góp", key=f"req_leave_{cur_trip}_{i}", use_container_width=True):
+                            if st.button("↩️ Hủy", key=f"req_leave_{cur_trip}_{i}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_reqs = current_db["trips"][cur_trip]["requirements"]
@@ -699,7 +750,7 @@ with t_req:
                                         st.rerun()
 
                     if can_manage_req:
-                        with c_del:
+                        with col_d:
                             if st.button("🗑️", key=f"req_del_{cur_trip}_{i}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
@@ -710,7 +761,6 @@ with t_req:
                                     add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_task}** (*{cur_trip}*).")
                                     if save_cloud(current_db):
                                         st.rerun()
-
 with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
