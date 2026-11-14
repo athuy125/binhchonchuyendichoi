@@ -1178,9 +1178,7 @@ with t_mem:
         cur_granted_lower = [u.strip().lower() for u in db.get("config", {}).get("granted_admins", [])]
         for idx, member_name in enumerate(all_members, start=1):
             role_tag = ""
-            if member_name.strip().lower() == "athuy125":
-                role_tag = ' <span style="background:#78350f; color:#fbbf24; padding:2px 8px; border-radius:8px; font-size:11px; margin-left:6px;">👑 Trưởng nhóm</span>'
-            elif is_admin and member_name.strip().lower() in cur_granted_lower:
+            if is_admin and member_name.strip().lower() in cur_granted_lower:
                 role_tag = ' <span style="background:#064e3b; color:#34d399; padding:2px 8px; border-radius:8px; font-size:11px; margin-left:6px;">🛡️ Được cấp quyền</span>'
 
             voted_places = [loc["name"] for loc in locs if member_name in loc.get("voters", [])]
@@ -1192,6 +1190,7 @@ with t_mem:
 
             card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}{role_tag}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
             st.markdown(card_html, unsafe_allow_html=True)
+
 with t_info:
     raw_desc = trip_data.get("desc", "").strip() or "Chưa có thông tin chi tiết cho chuyến đi này."
     safe_desc = html.escape(raw_desc)
