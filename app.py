@@ -634,18 +634,48 @@ with t_req:
     st.markdown(
         """
         <style>
+        /* Khóa cứng các cột nằm ngang trên cả điện thoại và máy tính, cho phép vuốt ngang mượt mà */
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            gap: 6px !important;
+            align-items: stretch !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            flex: 0 0 auto !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
+            min-width: 42px !important;
+            width: 42px !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
+            min-width: 155px !important;
+            width: 24% !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(3) {
+            min-width: 210px !important;
+            width: 32% !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(4) {
+            min-width: 145px !important;
+            width: 22% !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(5) {
+            min-width: 135px !important;
+            width: 16% !important;
+        }
         div[data-testid="stTextArea"] textarea {
-            padding: 6px 10px !important;
-            font-size: 13.5px !important;
+            padding: 6px 8px !important;
+            font-size: 13px !important;
             line-height: 1.4 !important;
             min-height: 40px !important;
-            resize: vertical !important;
             white-space: pre-wrap !important;
             word-wrap: break-word !important;
+            border-radius: 6px !important;
         }
         div[data-testid="column"] div.stButton > button {
             padding: 4px 6px !important;
-            font-size: 13px !important;
+            font-size: 12.5px !important;
             min-height: 40px !important;
             white-space: nowrap !important;
         }
@@ -665,7 +695,7 @@ with t_req:
 
     done_count = sum(1 for r in reqs if r.get("done", False))
     st.markdown(
-        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:9px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Ô chữ dài sẽ tự xuống dòng & mở rộng hàng. Bấm <b>💾 Lưu</b> sau khi sửa.</i></div>',
+        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:9px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Trên điện thoại có thể vuốt ngang bảng để xem & bấm sửa trực tiếp.</i></div>',
         unsafe_allow_html=True,
     )
 
@@ -745,7 +775,7 @@ with t_req:
             unsafe_allow_html=True,
         )
 
-        th1, th2, th3, th4, th5 = st.columns([0.38, 1.65, 2.05, 1.45, 1.37])
+        th1, th2, th3, th4, th5 = st.columns([0.4, 1.65, 2.05, 1.45, 1.35])
         with th1:
             st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 2px; font-size:11px; font-weight:800; color:#cbd5e1 !important; text-align:center;">TT</div>', unsafe_allow_html=True)
         with th2:
@@ -770,9 +800,9 @@ with t_req:
                 contributors = [x.strip() for x in clean_who.split(",") if x.strip()]
                 already_joined = (me in contributors)
 
-                row_h = calc_box_height([(task_val, 18), (note_val, 24), (clean_who, 16)])
+                row_h = calc_box_height([(task_val, 17), (note_val, 23), (clean_who, 15)])
 
-                c_chk, c_task, c_note, c_who, c_btn = st.columns([0.38, 1.65, 2.05, 1.45, 1.37])
+                c_chk, c_task, c_note, c_who, c_btn = st.columns([0.4, 1.65, 2.05, 1.45, 1.35])
 
                 with c_chk:
                     new_done = st.checkbox("", value=is_done, key=f"tbl_done_{cur_trip}_{i}", label_visibility="collapsed")
@@ -874,6 +904,7 @@ with t_req:
                     if save_cloud(current_db):
                         st.success("Đã lưu thay đổi!")
                         st.rerun()
+
 
 with t_mem:
     all_members = list(db["users"].keys())
