@@ -619,112 +619,148 @@ with t_loc:
                         if save_cloud(current_db):
                             st.rerun()
 with t_food:
+    DEFAULT_FOOD_IMGS = {
+        "🍖 Món chính": "https://unsplash.com",
+        "🥤 Thức uống": "https://unsplash.com",
+        "🍰 Tráng miệng": "https://unsplash.com",
+    }
+
     st.markdown(
         """
-        <div style="background:#161f33; border:2px solid #f59e0b; border-radius:14px; padding:14px 16px; margin-bottom:14px;">
-            <div style="font-size:18px; font-weight:800; color:#fbbf24 !important;">🍽️ BÌNH CHỌN MÓN ĂN & NƯỚC UỐNG</div>
-            <div style="font-size:15px; color:#ffffff !important; margin-top:4px;">Bấm nút <b>👍 CHỌN MÓN NÀY</b> ở bên dưới những món bạn muốn ăn hoặc uống (có thể chọn nhiều món).</div>
+        <div style="background:linear-gradient(90deg, #92400e, #1e293b); border:2px solid #f59e0b; border-radius:14px; padding:14px 18px; margin-bottom:14px;">
+            <div style="font-size:19px; font-weight:800; color:#fbbf24 !important; letter-spacing:0.5px;">🍽️ THỰC ĐƠN BÌNH CHỌN CỦA ĐỘI</div>
+            <div style="font-size:14.5px; color:#ffffff !important; margin-top:4px;">Xem hình món ăn bên dưới và bấm nút xanh <b>👍 CHỌN MÓN</b> để bình chọn (có thể chọn nhiều món).</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    with st.expander("➕ Bấm vào đây để thêm Món Ăn hoặc Nước Uống mới", expanded=False):
-        with st.form("add_food_form", clear_on_submit=True):
-            f_type = st.radio("Chọn loại:", ["🍖 Món Ăn", "🥤 Nước Uống"], horizontal=True)
-            f_name = st.text_input("Tên món ăn hoặc nước uống:", placeholder="Ví dụ: Gà nướng muối ớt, Lẩu thái, Nước ngọt...")
-            f_note = st.text_input("Ghi chú thêm (nếu có):", placeholder="Ví dụ: Mua sẵn hoặc tự ướp...")
-            if st.form_submit_button("✅ THÊM VÀO DANH SÁCH", use_container_width=True):
+    with st.expander("➕ Thêm Món Ăn / Thức Uống Mới (Có Hình Ảnh)", expanded=False):
+        with st.form("add_food_grid_form", clear_on_submit=True):
+            fc1, fc2 = st.columns(2)
+            with fc1:
+                f_cat = st.selectbox("Danh mục thực đơn:", ["🍖 Món chính", "🥤 Thức uống", "🍰 Tráng miệng"])
+            with fc2:
+                f_name = st.text_input("Tên món ăn / thức uống:", placeholder="VD: Gà nướng, Lẩu Thái, Nước ép...")
+            fc3, fc4 = st.columns(2)
+            with fc3:
+                f_price = st.text_input("Giá dự kiến / Ghi chú:", placeholder="VD: 150.000đ/con hoặc Tự ướp...")
+            with fc4:
+                f_img = st.text_input("Link hình ảnh (Bỏ trống sẽ tự lấy ảnh mẫu đẹp):", placeholder="https://...")
+            if st.form_submit_button("✅ ĐƯA MÓN LÊN THỰC ĐƠN", use_container_width=True):
                 if f_name.strip():
                     load_cloud.clear()
                     current_db = load_cloud()
                     food_list = current_db["trips"][cur_trip].setdefault("foods", [])
+                    chosen_img = f_img.strip() if f_img.strip().startswith("http") else DEFAULT_FOOD_IMGS.get(f_cat, DEFAULT_FOOD_IMGS["🍖 Món chính"])
                     food_list.append({
-                        "type": f_type,
+                        "type": f_cat,
                         "name": f_name.strip(),
-                        "note": f_note.strip(),
+                        "note": f_price.strip() or "Theo thực tế",
+                        "img": chosen_img,
                         "voters": [me],
                     })
-                    add_log(current_db, f"🍽️ **{me}** đã thêm **{f_name.strip()}** ({f_type}) vào thực đơn *{cur_trip}*.")
+                    add_log(current_db, f"🍽️ **{me}** đã thêm món **{f_name.strip()}** ({f_cat}) vào thực đơn *{cur_trip}*.")
                     if save_cloud(current_db):
-                        st.success(f"Đã thêm {f_name.strip()}!")
+                        st.success(f"Đã thêm {f_name.strip()} vào thực đơn!")
                         st.rerun()
                 else:
-                    st.warning("Vui lòng nhập tên món ăn hoặc nước uống!")
+                    st.warning("Vui lòng nhập tên món ăn hoặc thức uống!")
+
+    # Thanh danh mục lọc nhanh giống thanh menu ngang trong ảnh
+    cat_filter = st.radio(
+        "Danh mục:",
+        ["📋 Tất cả thực đơn", "🍖 Món chính", "🥤 Thức uống", "🍰 Tráng miệng"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
 
     foods = trip_data.get("foods", [])
     if not isinstance(foods, list) or len(foods) == 0:
-        st.info("Chưa có món ăn hay nước uống nào trong danh sách. Hãy bấm nút '➕ Bấm vào đây để thêm...' ở trên để thêm món đầu tiên!")
+        st.info("Thực đơn chưa có món nào. Hãy bấm nút '➕ Thêm Món Ăn / Thức Uống Mới' ở trên để thêm món đầu tiên!")
     else:
-        for group_label, header_bg, border_color in [
-            ("🍖 Món Ăn", "linear-gradient(90deg, #b45309, #1c1917)", "#f59e0b"),
-            ("🥤 Nước Uống", "linear-gradient(90deg, #0369a1, #0f172a)", "#38bdf8"),
-        ]:
-            group_indices = [idx for idx, item in enumerate(foods) if item.get("type", "🍖 Món Ăn") == group_label]
-            if not group_indices:
-                continue
+        filtered_indices = []
+        for idx_f, item in enumerate(foods):
+            item_type = item.get("type", "🍖 Món chính")
+            if item_type == "🍖 Món Ăn":
+                item_type = "🍖 Món chính"
+            elif item_type == "🥤 Nước Uống":
+                item_type = "🥤 Thức uống"
+            if cat_filter == "📋 Tất cả thực đơn" or item_type == cat_filter:
+                filtered_indices.append(idx_f)
 
-            st.markdown(
-                f'<div style="background:{header_bg}; border:2px solid {border_color}; border-radius:12px; padding:10px 14px; font-size:17px; font-weight:800; color:#ffffff !important; margin-top:16px; margin-bottom:10px;">{group_label} ({len(group_indices)} món)</div>',
-                unsafe_allow_html=True,
-            )
+        if not filtered_indices:
+            st.info(f"Chưa có món nào trong mục {cat_filter}.")
+        else:
+            # Chia lưới 2 cột thẻ sản phẩm có ảnh lớn, dễ nhìn trên cả điện thoại và máy tính
+            for start_i in range(0, len(filtered_indices), 2):
+                grid_cols = st.columns(2)
+                for offset in range(2):
+                    if start_i + offset >= len(filtered_indices):
+                        break
+                    idx_f = filtered_indices[start_i + offset]
+                    f_item = foods[idx_f]
+                    f_voters = f_item.get("voters", [])
+                    is_voted = (me in f_voters)
+                    f_type = f_item.get("type", "🍖 Món chính")
+                    img_url = str(f_item.get("img", "")).strip()
+                    if not img_url.startswith("http"):
+                        img_url = DEFAULT_FOOD_IMGS.get(f_type, DEFAULT_FOOD_IMGS["🍖 Món chính"])
 
-            for idx_f in group_indices:
-                f_item = foods[idx_f]
-                f_voters = f_item.get("voters", [])
-                is_f_voted = (me in f_voters)
-                f_note_str = str(f_item.get("note", "")).strip()
+                    card_border = "#10b981" if is_voted else "#334155"
+                    voters_str = ", ".join(f_voters) if f_voters else "Chưa ai chọn"
 
-                card_border = "#10b981" if is_f_voted else "#334155"
-                card_bg = "#0d211c" if is_f_voted else "#131b2e"
-                voters_text = ", ".join(f_voters) if f_voters else "Chưa có ai chọn"
-                note_block = f'<div style="color:#fde68a !important; font-size:14.5px; margin-top:4px;">📝 {html.escape(f_note_str)}</div>' if f_note_str else ""
+                    with grid_cols[offset]:
+                        st.markdown(
+                            f"""
+                            <div style="background:#131b2e; border:2px solid {card_border}; border-radius:14px; overflow:hidden; margin-bottom:8px;">
+                                <div style="position:relative; width:100%; height:165px; background:#090d16;">
+                                    <img src="{html.escape(img_url)}" style="width:100%; height:165px; object-fit:cover; display:block;" />
+                                    <span style="position:absolute; top:8px; left:8px; background:rgba(15,23,42,0.88); color:#fbbf24 !important; padding:3px 9px; border-radius:8px; font-size:11.5px; font-weight:700; border:1px solid #f59e0b;">{html.escape(f_type)}</span>
+                                    <span style="position:absolute; top:8px; right:8px; background:#064e3b; color:#6ee7b7 !important; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:800; border:1px solid #10b981;">🔥 {len(f_voters)} chọn</span>
+                                </div>
+                                <div style="padding:12px; text-align:center;">
+                                    <div style="font-size:16.5px; font-weight:800; color:#ffffff !important; text-transform:uppercase; margin-bottom:4px;">{html.escape(f_item.get("name", ""))}</div>
+                                    <div style="font-size:14px; font-weight:700; color:#fb923c !important; margin-bottom:6px;">{html.escape(f_item.get("note", "") or "Theo thực tế")}</div>
+                                    <div style="font-size:12.5px; color:#cbd5e1 !important; min-height:34px;">👤 <b>Đã chọn:</b> {html.escape(voters_str)}</div>
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
 
-                st.markdown(
-                    f"""
-                    <div style="background:{card_bg}; border:2px solid {card_border}; border-radius:14px; padding:14px 16px; margin-bottom:6px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
-                            <span style="font-size:18px; font-weight:800; color:#ffffff !important;">{html.escape(f_item.get("name", ""))}</span>
-                            <span style="background:#064e3b; border:1px solid #10b981; color:#6ee7b7 !important; padding:4px 12px; border-radius:20px; font-size:14px; font-weight:800;">🔥 {len(f_voters)} người chọn</span>
-                        </div>
-                        {note_block}
-                        <div style="color:#cbd5e1 !important; font-size:14px; margin-top:8px;">👤 <b>Ai đã chọn:</b> {html.escape(voters_text)}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                        b1, b2 = st.columns([3.8, 1])
+                        with b1:
+                            btn_txt = "✅ ĐÃ CHỌN (Bỏ)" if is_voted else "👍 CHỌN MÓN"
+                            if st.button(btn_txt, key=f"grid_vote_food_{cur_trip}_{idx_f}", use_container_width=True):
+                                load_cloud.clear()
+                                current_db = load_cloud()
+                                cur_foods = current_db["trips"][cur_trip].get("foods", [])
+                                if idx_f < len(cur_foods):
+                                    v_list = cur_foods[idx_f].get("voters", [])
+                                    if me in v_list:
+                                        v_list.remove(me)
+                                        add_log(current_db, f"↩️ **{me}** đã bỏ chọn món **{cur_foods[idx_f]['name']}** (*{cur_trip}*).")
+                                    else:
+                                        v_list.append(me)
+                                        add_log(current_db, f"🍽️ **{me}** đã chọn món **{cur_foods[idx_f]['name']}** (*{cur_trip}*).")
+                                    cur_foods[idx_f]["voters"] = v_list
+                                    if save_cloud(current_db):
+                                        st.rerun()
+                        with b2:
+                            if st.button("🗑️", key=f"grid_del_food_{cur_trip}_{idx_f}", use_container_width=True):
+                                load_cloud.clear()
+                                current_db = load_cloud()
+                                cur_foods = current_db["trips"][cur_trip].get("foods", [])
+                                if idx_f < len(cur_foods):
+                                    del_fn = cur_foods[idx_f].get("name", "")
+                                    cur_foods.pop(idx_f)
+                                    add_log(current_db, f"🗑️ **{me}** đã xóa món **{del_fn}** (*{cur_trip}*).")
+                                    if save_cloud(current_db):
+                                        st.rerun()
 
-                btn_f1, btn_f2 = st.columns([4.5, 1])
-                with btn_f1:
-                    btn_label = "✅ ĐÃ CHỌN MÓN NÀY (Bấm để bỏ)" if is_f_voted else "👍 CHỌN MÓN NÀY"
-                    if st.button(btn_label, key=f"vote_food_{cur_trip}_{idx_f}", use_container_width=True):
-                        load_cloud.clear()
-                        current_db = load_cloud()
-                        cur_foods = current_db["trips"][cur_trip].get("foods", [])
-                        if idx_f < len(cur_foods):
-                            v_list = cur_foods[idx_f].get("voters", [])
-                            if me in v_list:
-                                v_list.remove(me)
-                                add_log(current_db, f"↩️ **{me}** đã bỏ chọn món **{cur_foods[idx_f]['name']}** (*{cur_trip}*).")
-                            else:
-                                v_list.append(me)
-                                add_log(current_db, f"🍽️ **{me}** đã chọn món **{cur_foods[idx_f]['name']}** (*{cur_trip}*).")
-                            cur_foods[idx_f]["voters"] = v_list
-                            if save_cloud(current_db):
-                                st.rerun()
-                with btn_f2:
-                    if st.button("🗑️", key=f"del_food_{cur_trip}_{idx_f}", use_container_width=True):
-                        load_cloud.clear()
-                        current_db = load_cloud()
-                        cur_foods = current_db["trips"][cur_trip].get("foods", [])
-                        if idx_f < len(cur_foods):
-                            del_fname = cur_foods[idx_f].get("name", "")
-                            cur_foods.pop(idx_f)
-                            add_log(current_db, f"🗑️ **{me}** đã xóa món **{del_fname}** (*{cur_trip}*).")
-                            if save_cloud(current_db):
-                                st.rerun()
+                        st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
-                st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 
 with t_req:
     can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
