@@ -565,34 +565,19 @@ if st.button("⬅️ Quay lại danh sách chuyến đi", use_container_width=Tr
     st.session_state.selected_trip = None
     st.rerun()
 
-raw_desc = trip_data.get("desc", "").strip() or "Chưa có thông tin chi tiết cho chuyến đi này."
-safe_desc = html.escape(raw_desc)
-HEADER_DESC_HTML = f"""
-<div class="notice-board">
-    <div style="font-size:20px; font-weight:800; color:#38bdf8; margin-bottom:8px;">⛺ {html.escape(cur_trip.upper())}</div>
-    <div class="notice-title">📢 THÔNG TIN & MÔ TẢ LỊCH TRÌNH</div>
-    <div class="notice-body">{safe_desc}</div>
-</div>
-"""
-st.markdown(HEADER_DESC_HTML, unsafe_allow_html=True)
+st.markdown(
+    f'<div style="background:linear-gradient(90deg, #059669, #2563eb); border-radius:12px; padding:12px 16px; margin-bottom:12px; font-size:19px; font-weight:800; color:#ffffff !important; text-align:center;">⛺ {html.escape(cur_trip.upper())}</div>',
+    unsafe_allow_html=True,
+)
 
-if has_power:
-    with st.expander("✏️ Chỉnh sửa thông tin / ảnh bìa chuyến đi", expanded=False):
-        with st.form("edit_trip_desc_form"):
-            updated_desc = st.text_area("Nội dung thông báo / lịch trình", value=trip_data.get("desc", ""), height=100)
-            updated_t_img = st.text_input("Link ảnh bìa chuyến đi", value=trip_data.get("img", DEFAULT_TRIP_IMG))
-            if st.form_submit_button("💾 Lưu thay đổi", use_container_width=True):
-                load_cloud.clear()
-                current_db = load_cloud()
-                if cur_trip in current_db["trips"]:
-                    current_db["trips"][cur_trip]["desc"] = updated_desc.strip()
-                    if updated_t_img.strip().startswith("http"):
-                        current_db["trips"][cur_trip]["img"] = updated_t_img.strip()
-                    add_log(current_db, f"📝 Thông tin của **{cur_trip}** vừa được cập nhật.")
-                    if save_cloud(current_db):
-                        st.success("Đã cập nhật thông tin chuyến đi!")
-                        st.rerun()
-t_loc, t_food, t_req, t_mem = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🍽️ Bình Chọn Thức Ăn", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên"])
+t_loc, t_food, t_req, t_mem, t_info = st.tabs([
+    "🗳️ Bình Chọn Địa Điểm",
+    "🍽️ Bình Chọn Thức Ăn",
+    "🎒 Đồ Cần Chuẩn Bị",
+    "👥 Thành Viên",
+    "📋 Thông Tin & Lịch Trình",
+])
+
 
 with t_loc:
     dl_str = trip_data.get("vote_deadline", "")
@@ -1121,6 +1106,35 @@ with t_req:
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
 with t_mem:
+with t_info:
+    raw_desc = trip_data.get("desc", "").strip() or "Chưa có thông tin chi tiết cho chuyến đi này."
+    safe_desc = html.escape(raw_desc)
+    HEADER_DESC_HTML = f"""
+    <div class="notice-board">
+        <div style="font-size:20px; font-weight:800; color:#38bdf8; margin-bottom:8px;">⛺ {html.escape(cur_trip.upper())}</div>
+        <div class="notice-title">📢 THÔNG TIN & MÔ TẢ LỊCH TRÌNH</div>
+        <div class="notice-body">{safe_desc}</div>
+    </div>
+    """
+    st.markdown(HEADER_DESC_HTML, unsafe_allow_html=True)
+
+    if has_power:
+        with st.expander("✏️ Chỉnh sửa thông tin / ảnh bìa chuyến đi", expanded=False):
+            with st.form("edit_trip_desc_form"):
+                updated_desc = st.text_area("Nội dung thông báo / lịch trình", value=trip_data.get("desc", ""), height=130)
+                updated_t_img = st.text_input("Link ảnh bìa chuyến đi", value=trip_data.get("img", DEFAULT_TRIP_IMG))
+                if st.form_submit_button("💾 Lưu thay đổi", use_container_width=True):
+                    load_cloud.clear()
+                    current_db = load_cloud()
+                    if cur_trip in current_db["trips"]:
+                        current_db["trips"][cur_trip]["desc"] = updated_desc.strip()
+                        if updated_t_img.strip().startswith("http"):
+                            current_db["trips"][cur_trip]["img"] = updated_t_img.strip()
+                        add_log(current_db, f"📝 Thông tin của **{cur_trip}** vừa được cập nhật.")
+                        if save_cloud(current_db):
+                            st.success("Đã cập nhật thông tin chuyến đi!")
+                            st.rerun()
+
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
 
