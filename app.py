@@ -248,7 +248,7 @@ if st.session_state.user is None:
                             st.rerun()
 
     st.stop()
-
+db = load_cloud()
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
 
