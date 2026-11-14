@@ -642,7 +642,7 @@ with t_req:
 
     done_count = sum(1 for r in reqs if r.get("done", False))
     st.markdown(
-        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:10px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Bấm trực tiếp vào ô chữ bất kỳ trong bảng để sửa, sau đó bấm <b>💾 Lưu bảng</b>.</i></div>',
+        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:10px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Bấm trực tiếp vào ô chữ bất kỳ để sửa, sau đó bấm <b>💾 Lưu</b>.</i></div>',
         unsafe_allow_html=True,
     )
 
@@ -725,9 +725,9 @@ with t_req:
                 already_joined = (me in contributors)
 
                 with st.container(border=True):
-                    c_chk, c_task, c_note, c_who, c_btn = st.columns([0.45, 1.8, 2.0, 1.55, 1.2])
+                    r1_chk, r1_task, r1_note = st.columns([0.4, 2.2, 2.9])
 
-                    with c_chk:
+                    with r1_chk:
                         new_done = st.checkbox("", value=is_done, key=f"tbl_done_{cur_trip}_{i}", label_visibility="collapsed")
                         if new_done != is_done:
                             load_cloud.clear()
@@ -740,51 +740,52 @@ with t_req:
                                 if save_cloud(current_db):
                                     st.rerun()
 
-                    with c_task:
+                    with r1_task:
                         st.text_input("Tên vật dụng", value=str(req.get("task", "")), placeholder="Gõ tên món / đồ...", key=f"tbl_task_{cur_trip}_{i}", label_visibility="collapsed")
 
-                    with c_note:
+                    with r1_note:
                         st.text_input("SL / Ghi chú", value=str(req.get("qty_note", "")), placeholder="SL / Ghi chú...", key=f"tbl_note_{cur_trip}_{i}", label_visibility="collapsed")
 
-                    with c_who:
+                    r2_who, r2_join, r2_del = st.columns([3.2, 1.6, 0.7])
+
+                    with r2_who:
                         st.text_input("Người góp", value=clean_who, placeholder="Chưa ai góp...", key=f"tbl_who_{cur_trip}_{i}", label_visibility="collapsed")
 
-                    with c_btn:
-                        b_g1, b_g2 = st.columns([2.1, 1])
-                        with b_g1:
-                            if already_joined:
-                                if st.button("↩️ Hủy", key=f"tbl_leave_{cur_trip}_{i}", use_container_width=True):
-                                    load_cloud.clear()
-                                    current_db = load_cloud()
-                                    t_reqs = current_db["trips"][cur_trip]["requirements"]
-                                    if i < len(t_reqs):
-                                        contributors.remove(me)
-                                        t_reqs[i]["assigned"] = ", ".join(contributors)
-                                        add_log(current_db, f"↩️ **{me}** đã rút tên khỏi mục **{t_reqs[i]['task']}** (*{cur_trip}*).")
-                                        if save_cloud(current_db):
-                                            st.rerun()
-                            else:
-                                if st.button("🙋‍♂️ Góp", key=f"tbl_join_{cur_trip}_{i}", use_container_width=True):
-                                    load_cloud.clear()
-                                    current_db = load_cloud()
-                                    t_reqs = current_db["trips"][cur_trip]["requirements"]
-                                    if i < len(t_reqs):
-                                        contributors.append(me)
-                                        t_reqs[i]["assigned"] = ", ".join(contributors)
-                                        add_log(current_db, f"🙋‍♂️ **{me}** đã đăng ký góp **{t_reqs[i]['task']}** (*{cur_trip}*).")
-                                        if save_cloud(current_db):
-                                            st.rerun()
-                        with b_g2:
-                            if st.button("🗑️", key=f"tbl_del_{cur_trip}_{i}", use_container_width=True):
+                    with r2_join:
+                        if already_joined:
+                            if st.button("↩️ Hủy góp", key=f"tbl_leave_{cur_trip}_{i}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_reqs = current_db["trips"][cur_trip]["requirements"]
                                 if i < len(t_reqs):
-                                    del_name = t_reqs[i].get("task", "mục trống")
-                                    t_reqs.pop(i)
-                                    add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_name}** (*{cur_trip}*).")
+                                    contributors.remove(me)
+                                    t_reqs[i]["assigned"] = ", ".join(contributors)
+                                    add_log(current_db, f"↩️ **{me}** đã rút tên khỏi mục **{t_reqs[i]['task']}** (*{cur_trip}*).")
                                     if save_cloud(current_db):
                                         st.rerun()
+                        else:
+                            if st.button("🙋‍♂️ Tôi góp", key=f"tbl_join_{cur_trip}_{i}", use_container_width=True):
+                                load_cloud.clear()
+                                current_db = load_cloud()
+                                t_reqs = current_db["trips"][cur_trip]["requirements"]
+                                if i < len(t_reqs):
+                                    contributors.append(me)
+                                    t_reqs[i]["assigned"] = ", ".join(contributors)
+                                    add_log(current_db, f"🙋‍♂️ **{me}** đã đăng ký góp **{t_reqs[i]['task']}** (*{cur_trip}*).")
+                                    if save_cloud(current_db):
+                                        st.rerun()
+
+                    with r2_del:
+                        if st.button("🗑️", key=f"tbl_del_{cur_trip}_{i}", use_container_width=True):
+                            load_cloud.clear()
+                            current_db = load_cloud()
+                            t_reqs = current_db["trips"][cur_trip]["requirements"]
+                            if i < len(t_reqs):
+                                del_name = t_reqs[i].get("task", "mục trống")
+                                t_reqs.pop(i)
+                                add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_name}** (*{cur_trip}*).")
+                                if save_cloud(current_db):
+                                    st.rerun()
 
                     if extra_cols:
                         ec_cols = st.columns(len(extra_cols))
@@ -792,10 +793,9 @@ with t_req:
                             with ec_cols[ec_i]:
                                 st.text_input(ec_name, value=str(req.get(ec_name, "")), placeholder=f"{ec_name}...", key=f"tbl_ec_{cur_trip}_{i}_{ec_name}")
 
-        # Nút thêm dòng mới & lưu nội dung trực tiếp ngay dưới chân mỗi bảng
-        foot_c1, foot_c2 = st.columns([1, 1])
+        foot_c1, foot_c2 = st.columns(2)
         with foot_c1:
-            if st.button(f"➕ Thêm hàng vào bảng này", key=f"add_row_cat_{cat_idx}", use_container_width=True):
+            if st.button("➕ Thêm hàng vào bảng này", key=f"add_row_cat_{cat_idx}", use_container_width=True):
                 load_cloud.clear()
                 current_db = load_cloud()
                 blank_item = {"category": cat_title, "task": "Mục mới (bấm để sửa)", "qty_note": "", "assigned": "", "done": False}
@@ -806,7 +806,7 @@ with t_req:
                     st.rerun()
         with foot_c2:
             if cat_indices:
-                if st.button(f"💾 Lưu chữ đã sửa ở bảng này", key=f"save_cat_{cat_idx}", use_container_width=True):
+                if st.button("💾 Lưu chữ đã sửa ở bảng này", key=f"save_cat_{cat_idx}", use_container_width=True):
                     load_cloud.clear()
                     current_db = load_cloud()
                     t_reqs = current_db["trips"][cur_trip]["requirements"]
