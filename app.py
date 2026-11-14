@@ -631,6 +631,16 @@ with t_loc:
                         if save_cloud(current_db):
                             st.rerun()
 with t_req:
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stTextInput"] input { padding: 6px 10px !important; font-size: 13.5px !important; min-height: 36px !important; }
+        div[data-testid="column"] div.stButton > button { padding: 4px 6px !important; font-size: 13px !important; min-height: 36px !important; white-space: nowrap !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     can_manage_req = is_admin or (me.strip().lower() == "trần phước long")
     reqs = trip_data.get("requirements", [])
     if not isinstance(reqs, list):
@@ -642,7 +652,7 @@ with t_req:
 
     done_count = sum(1 for r in reqs if r.get("done", False))
     st.markdown(
-        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:10px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Bấm trực tiếp vào ô chữ bất kỳ để sửa, sau đó bấm <b>💾 Lưu</b>.</i></div>',
+        f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:9px 14px; margin-bottom:12px; font-size:13.5px;">📊 <b>Tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã xong &nbsp;|&nbsp; <i>Bấm trực tiếp vào ô trong bảng để sửa, sau đó bấm <b>💾 Lưu</b>.</i></div>',
         unsafe_allow_html=True,
     )
 
@@ -709,9 +719,22 @@ with t_req:
         )
 
         st.markdown(
-            f'<div style="background:{bg_grad}; border:1px solid {border_col}; border-radius:10px 10px 0 0; padding:10px 14px; font-weight:800; color:{txt_col} !important; font-size:15px; margin-top:18px;">{html.escape(cat_title)} ({len(cat_indices)} mục)</div>',
+            f'<div style="background:{bg_grad}; border:1px solid {border_col}; border-radius:10px 10px 0 0; padding:10px 14px; font-weight:800; color:{txt_col} !important; font-size:15px; margin-top:20px;">{html.escape(cat_title)} ({len(cat_indices)} mục)</div>',
             unsafe_allow_html=True,
         )
+
+        # Hàng tiêu đề cột chuẩn của bảng
+        th1, th2, th3, th4, th5 = st.columns([0.38, 1.65, 2.05, 1.45, 1.37])
+        with th1:
+            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 2px; font-size:11px; font-weight:800; color:#cbd5e1 !important; text-align:center;">TT</div>', unsafe_allow_html=True)
+        with th2:
+            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 8px; font-size:11px; font-weight:800; color:#cbd5e1 !important;">VẬT DỤNG</div>', unsafe_allow_html=True)
+        with th3:
+            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 8px; font-size:11px; font-weight:800; color:#cbd5e1 !important;">SL / GHI CHÚ</div>', unsafe_allow_html=True)
+        with th4:
+            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 8px; font-size:11px; font-weight:800; color:#cbd5e1 !important;">NGƯỜI GÓP</div>', unsafe_allow_html=True)
+        with th5:
+            st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px 4px; font-size:11px; font-weight:800; color:#cbd5e1 !important; text-align:center;">THAO TÁC</div>', unsafe_allow_html=True)
 
         if not cat_indices:
             st.caption("Chưa có mục nào trong bảng này. Bấm nút bên dưới để thêm dòng mới.")
@@ -724,36 +747,35 @@ with t_req:
                 contributors = [x.strip() for x in clean_who.split(",") if x.strip()]
                 already_joined = (me in contributors)
 
-                with st.container(border=True):
-                    r1_chk, r1_task, r1_note = st.columns([0.4, 2.2, 2.9])
+                c_chk, c_task, c_note, c_who, c_btn = st.columns([0.38, 1.65, 2.05, 1.45, 1.37])
 
-                    with r1_chk:
-                        new_done = st.checkbox("", value=is_done, key=f"tbl_done_{cur_trip}_{i}", label_visibility="collapsed")
-                        if new_done != is_done:
-                            load_cloud.clear()
-                            current_db = load_cloud()
-                            t_reqs = current_db["trips"][cur_trip]["requirements"]
-                            if i < len(t_reqs):
-                                t_reqs[i]["done"] = new_done
-                                status_txt = "đã xong" if new_done else "chưa xong"
-                                add_log(current_db, f"✅ **{me}** đánh dấu **{t_reqs[i]['task']}** ({status_txt}) trong *{cur_trip}*.")
-                                if save_cloud(current_db):
-                                    st.rerun()
+                with c_chk:
+                    new_done = st.checkbox("", value=is_done, key=f"tbl_done_{cur_trip}_{i}", label_visibility="collapsed")
+                    if new_done != is_done:
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        t_reqs = current_db["trips"][cur_trip]["requirements"]
+                        if i < len(t_reqs):
+                            t_reqs[i]["done"] = new_done
+                            status_txt = "đã xong" if new_done else "chưa xong"
+                            add_log(current_db, f"✅ **{me}** đánh dấu **{t_reqs[i]['task']}** ({status_txt}) trong *{cur_trip}*.")
+                            if save_cloud(current_db):
+                                st.rerun()
 
-                    with r1_task:
-                        st.text_input("Tên vật dụng", value=str(req.get("task", "")), placeholder="Gõ tên món / đồ...", key=f"tbl_task_{cur_trip}_{i}", label_visibility="collapsed")
+                with c_task:
+                    st.text_input("Vật dụng", value=str(req.get("task", "")), placeholder="Tên vật dụng...", key=f"tbl_task_{cur_trip}_{i}", label_visibility="collapsed")
 
-                    with r1_note:
-                        st.text_input("SL / Ghi chú", value=str(req.get("qty_note", "")), placeholder="SL / Ghi chú...", key=f"tbl_note_{cur_trip}_{i}", label_visibility="collapsed")
+                with c_note:
+                    st.text_input("Ghi chú", value=str(req.get("qty_note", "")), placeholder="SL / Ghi chú...", key=f"tbl_note_{cur_trip}_{i}", label_visibility="collapsed")
 
-                    r2_who, r2_join, r2_del = st.columns([3.2, 1.6, 0.7])
+                with c_who:
+                    st.text_input("Người góp", value=clean_who, placeholder="Chưa ai góp...", key=f"tbl_who_{cur_trip}_{i}", label_visibility="collapsed")
 
-                    with r2_who:
-                        st.text_input("Người góp", value=clean_who, placeholder="Chưa ai góp...", key=f"tbl_who_{cur_trip}_{i}", label_visibility="collapsed")
-
-                    with r2_join:
+                with c_btn:
+                    b_g1, b_g2 = st.columns([2.2, 1])
+                    with b_g1:
                         if already_joined:
-                            if st.button("↩️ Hủy góp", key=f"tbl_leave_{cur_trip}_{i}", use_container_width=True):
+                            if st.button("↩️ Hủy", key=f"tbl_leave_{cur_trip}_{i}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_reqs = current_db["trips"][cur_trip]["requirements"]
@@ -764,7 +786,7 @@ with t_req:
                                     if save_cloud(current_db):
                                         st.rerun()
                         else:
-                            if st.button("🙋‍♂️ Tôi góp", key=f"tbl_join_{cur_trip}_{i}", use_container_width=True):
+                            if st.button("🙋‍♂️ Góp", key=f"tbl_join_{cur_trip}_{i}", use_container_width=True):
                                 load_cloud.clear()
                                 current_db = load_cloud()
                                 t_reqs = current_db["trips"][cur_trip]["requirements"]
@@ -774,8 +796,7 @@ with t_req:
                                     add_log(current_db, f"🙋‍♂️ **{me}** đã đăng ký góp **{t_reqs[i]['task']}** (*{cur_trip}*).")
                                     if save_cloud(current_db):
                                         st.rerun()
-
-                    with r2_del:
+                    with b_g2:
                         if st.button("🗑️", key=f"tbl_del_{cur_trip}_{i}", use_container_width=True):
                             load_cloud.clear()
                             current_db = load_cloud()
@@ -787,11 +808,13 @@ with t_req:
                                 if save_cloud(current_db):
                                     st.rerun()
 
-                    if extra_cols:
-                        ec_cols = st.columns(len(extra_cols))
-                        for ec_i, ec_name in enumerate(extra_cols):
-                            with ec_cols[ec_i]:
-                                st.text_input(ec_name, value=str(req.get(ec_name, "")), placeholder=f"{ec_name}...", key=f"tbl_ec_{cur_trip}_{i}_{ec_name}")
+                if extra_cols:
+                    ec_cols = st.columns(len(extra_cols))
+                    for ec_i, ec_name in enumerate(extra_cols):
+                        with ec_cols[ec_i]:
+                            st.text_input(ec_name, value=str(req.get(ec_name, "")), placeholder=f"{ec_name}...", key=f"tbl_ec_{cur_trip}_{i}_{ec_name}")
+
+                st.markdown('<div style="border-bottom:1px solid #1e293b; margin:2px 0 6px 0;"></div>', unsafe_allow_html=True)
 
         foot_c1, foot_c2 = st.columns(2)
         with foot_c1:
