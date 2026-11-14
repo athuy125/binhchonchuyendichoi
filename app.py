@@ -209,7 +209,7 @@ if st.session_state.user is None:
                         fresh_db.setdefault("sessions", {})[new_tk] = name
                         save_cloud(fresh_db)
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_v18", new_tk, expires_at=exp_date)
+                                   cookie_manager.set("team_trip_session_lq", new_tk, expires_at=exp_date)
                         st.query_params["token"] = new_tk
                         st.session_state.active_token = new_tk
                         st.session_state.user = name
@@ -237,7 +237,8 @@ if st.session_state.user is None:
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = r_name
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_v18", new_tk, expires_at=exp_date)
+                                                cookie_manager.set("team_trip_session_lq", new_tk, expires_at=exp_date)
+
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.query_params["token"] = new_tk
@@ -251,13 +252,24 @@ if st.session_state.user is None:
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
 
-cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_v18")
+cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_lq")
 if cur_session_tk:
     if st.query_params.get("token", "") != cur_session_tk:
         st.query_params["token"] = cur_session_tk
+    # Ghi cứng mã phiên vào bộ nhớ vĩnh viễn localStorage của thiết bị
+    components.html(
+        f"""
+        <script>
+        try {{
+            window.parent.localStorage.setItem("team_trip_lq_token", "{cur_session_tk}");
+        }} catch (e) {{}}
+        </script>
+        """,
+        height=0,
+    )
     if not st.session_state.get("cookie_refreshed"):
         exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-        cookie_manager.set("team_trip_session_v18", cur_session_tk, expires_at=exp_d)
+        cookie_manager.set("team_trip_session_lq", cur_session_tk, expires_at=exp_d)
         st.session_state.cookie_refreshed = True
 
 need_deadline_save = False
@@ -296,6 +308,34 @@ with col_b:
         st.rerun()
 with col_c:
     if st.button("Thoát", use_container_width=True):
+        if cur_session_tk:
+            load_cloud.clear()
+            clean_db = load_cloud()
+            if cur_session_tk in clean_db.get("sessions", {}):
+                del clean_db["sessions"][cur_session_tk]
+                save_cloud(clean_db)
+            try:
+                cookie_manager.delete("team_trip_session_lq")
+            except Exception:
+                pass
+        components.html(
+            """
+            <script>
+            try {
+                window.parent.localStorage.removeItem("team_trip_lq_token");
+            } catch (e) {}
+            </script>
+            """,
+            height=0,
+        )
+        time.sleep(0.5)
+        st.query_params.clear()
+        st.session_state.active_token = ""
+        st.session_state.cookie_refreshed = False
+        st.session_state.user = None
+        st.session_state.selected_trip = None
+        st.rerun()
+
         if cur_session_tk:
             load_cloud.clear()
             clean_db = load_cloud()
