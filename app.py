@@ -925,7 +925,7 @@ with t_food:
                                     if save_cloud(current_db):
                                         st.rerun()
 
-                                                if has_power:
+                        if has_power:
                             with st.expander("🖼️ Đổi ảnh / Sửa món"):
                                 with st.form(f"edit_food_{cur_trip}_{idx_f}"):
                                     ef_name = st.text_input("Tên món", value=f_item.get("name", ""))
@@ -943,6 +943,9 @@ with t_food:
                                                 cur_foods[idx_f]["img"] = ef_img.strip()
                                             if save_cloud(current_db):
                                                 st.rerun()
+
+                        st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
+
 
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
