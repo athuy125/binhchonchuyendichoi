@@ -678,14 +678,23 @@ with t_req:
                             st.rerun()
                     else:
                         st.warning("Vui lòng nhập tên vật dụng!")
-    reqs = trip_data.get("requirements", [])
+        reqs = trip_data.get("requirements", [])
     if len(reqs) == 0:
         st.info("Chưa có đồ dùng nào trong danh sách của chuyến đi này.")
     else:
         done_count = sum(1 for r in reqs if r.get("done", False))
-        st.caption(f"📊 **Tổng tiến độ chuẩn bị:** Đã hoàn thành **{done_count}/{len(reqs)}** mục")
+        st.markdown(
+            f'<div style="background:#131c31; border:1px solid #334155; border-radius:10px; padding:8px 14px; margin-bottom:10px; font-size:13.5px;">📊 <b>Tổng tiến độ chuẩn bị:</b> <span style="color:#34d399; font-weight:800;">{done_count}/{len(reqs)}</span> mục đã hoàn thành</div>',
+            unsafe_allow_html=True,
+        )
 
         categories_order = ["📦 Nhu Yếu Phẩm & Vật Dụng", "🍖 Thức Ăn & Nước Uống", "🍳 Dụng Cụ Nấu Ăn & Khác"]
+        cat_themes = {
+            "📦 Nhu Yếu Phẩm & Vật Dụng": ("linear-gradient(90deg, #1d4ed8, #0f172a)", "#60a5fa", "#dbeafe"),
+            "🍖 Thức Ăn & Nước Uống": ("linear-gradient(90deg, #b45309, #1c1917)", "#f59e0b", "#fef3c7"),
+            "🍳 Dụng Cụ Nấu Ăn & Khác": ("linear-gradient(90deg, #047857, #064e3b)", "#10b981", "#d1fae5"),
+        }
+
         existing_cats = []
         for r in reqs:
             c_name = r.get("category", "📦 Nhu Yếu Phẩm & Vật Dụng")
@@ -698,25 +707,36 @@ with t_req:
             if not cat_indices:
                 continue
 
-            # Thanh tiêu đề bảng & Hàng tiêu đề cột giống hệt bảng gốc
-            st.markdown(f'<div class="grid-title">{html.escape(cat_title)} ({len(cat_indices)} mục)</div>', unsafe_allow_html=True)
+            bg_grad, border_col, txt_col = cat_themes.get(
+                cat_title, ("linear-gradient(90deg, #1e3a8a, #0f172a)", "#3b82f6", "#93c5fd")
+            )
+
+            st.markdown(
+                f'<div style="background:{bg_grad}; border:1px solid {border_col}; border-radius:10px 10px 0 0; padding:10px 14px; font-weight:800; color:{txt_col} !important; font-size:15px; margin-top:16px;">{html.escape(cat_title)} ({len(cat_indices)} mục)</div>',
+                unsafe_allow_html=True,
+            )
+
             h1, h2, h3, h4, h5 = st.columns([0.55, 1.55, 2.1, 1.35, 1.35])
             with h1:
-                st.markdown('<div class="grid-head" style="text-align:center;">TT</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px; font-size:11.5px; font-weight:800; color:#cbd5e1 !important; text-align:center;">TT</div>', unsafe_allow_html=True)
             with h2:
-                st.markdown('<div class="grid-head">Vật dụng</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px; font-size:11.5px; font-weight:800; color:#cbd5e1 !important;">VẬT DỤNG</div>', unsafe_allow_html=True)
             with h3:
-                st.markdown('<div class="grid-head">SL / Ghi chú</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px; font-size:11.5px; font-weight:800; color:#cbd5e1 !important;">SL / GHI CHÚ</div>', unsafe_allow_html=True)
             with h4:
-                st.markdown('<div class="grid-head">Người góp</div>', unsafe_allow_html=True)
+                st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px; font-size:11.5px; font-weight:800; color:#cbd5e1 !important;">NGƯỜI GÓP</div>', unsafe_allow_html=True)
             with h5:
-                st.markdown('<div class="grid-head" style="text-align:center;">Thao tác</div>', unsafe_allow_html=True)
-            for i in cat_indices:
+                st.markdown(f'<div style="background:#1e293b; border-bottom:2px solid {border_col}; padding:6px; font-size:11.5px; font-weight:800; color:#cbd5e1 !important; text-align:center;">THAO TÁC</div>', unsafe_allow_html=True)
+
+            for row_num, i in enumerate(cat_indices):
                 req = reqs[i]
                 is_done = req.get("done", False)
                 cur_assigned = req.get("assigned", "").strip()
                 contributors = [x.strip() for x in cur_assigned.split(",") if x.strip() and x.strip() not in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"]]
                 already_joined = (me in contributors)
+
+                row_bg = "#0d1b18" if is_done else ("#111827" if row_num % 2 == 0 else "#162033")
+                row_accent = "#10b981" if is_done else border_col
 
                 c1, c2, c3, c4, c5 = st.columns([0.55, 1.55, 2.1, 1.35, 1.35])
 
@@ -734,22 +754,22 @@ with t_req:
                                 if save_cloud(current_db):
                                     st.rerun()
                     else:
-                        st.markdown(f'<div class="grid-cell" style="text-align:center;">{"✅" if is_done else "⏳"}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="background:{row_bg}; border-left:4px solid {row_accent}; border-radius:6px; padding:7px 4px; text-align:center;">{"✅" if is_done else "⏳"}</div>', unsafe_allow_html=True)
 
                 with c2:
-                    t_style = "text-decoration:line-through; opacity:0.6;" if is_done else "font-weight:700;"
-                    st.markdown(f'<div class="grid-cell" style="{t_style}">{html.escape(req["task"])}</div>', unsafe_allow_html=True)
+                    t_style = "text-decoration:line-through; color:#94a3b8 !important;" if is_done else "font-weight:800; color:#ffffff !important;"
+                    st.markdown(f'<div style="background:{row_bg}; border-left:3px solid {row_accent}; border-radius:6px; padding:7px 8px; font-size:13.5px; {t_style}">{html.escape(req["task"])}</div>', unsafe_allow_html=True)
 
                 with c3:
                     note_txt = html.escape(req.get("qty_note", "").strip() or "-")
-                    st.markdown(f'<div class="grid-cell" style="color:#cbd5e1 !important; font-size:12.5px;">{note_txt}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="background:{row_bg}; border-radius:6px; padding:7px 8px; color:#fde68a !important; font-size:12.5px; line-height:1.4;">{note_txt}</div>', unsafe_allow_html=True)
 
                 with c4:
                     if contributors:
-                        who_html = f'<span style="color:#34d399 !important; font-weight:700;">🙋‍♂️ {html.escape(", ".join(contributors))}</span>'
+                        who_html = f'<span style="background:#064e3b; border:1px solid #10b981; color:#6ee7b7 !important; padding:3px 7px; border-radius:8px; font-size:12px; font-weight:700; display:inline-block;">🙋‍♂️ {html.escape(", ".join(contributors))}</span>'
                     else:
-                        who_html = '<span style="color:#94a3b8 !important; font-style:italic; font-size:12px;">Chưa có người góp</span>'
-                    st.markdown(f'<div class="grid-cell">{who_html}</div>', unsafe_allow_html=True)
+                        who_html = '<span style="background:#1e293b; border:1px dashed #475569; color:#94a3b8 !important; padding:3px 7px; border-radius:8px; font-size:11.5px; display:inline-block;">Chưa ai góp</span>'
+                    st.markdown(f'<div style="background:{row_bg}; border-radius:6px; padding:6px;">{who_html}</div>', unsafe_allow_html=True)
 
                 with c5:
                     if can_manage_req:
@@ -794,6 +814,7 @@ with t_req:
                                     add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_task}** (*{cur_trip}*).")
                                     if save_cloud(current_db):
                                         st.rerun()
+
 with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
