@@ -168,16 +168,6 @@ def save_cloud(data: dict) -> bool:
         return False
 
 cookie_manager = stx.CookieManager(key="team_auth_cookie_v18")
-
-if "user" not in st.session_state:
-    st.session_state.user = None
-if "selected_trip" not in st.session_state:
-    st.session_state.selected_trip = None
-if "active_token" not in st.session_state:
-    st.session_state.active_token = ""
-
-db = load_cloud()
-
 if st.session_state.user is None:
     url_tk = st.query_params.get("token", "")
     ck_tk = cookie_manager.get("team_trip_session_v18")
