@@ -1160,13 +1160,14 @@ with t_poster:
         if not poster_bg_img.startswith("http") or "unsplash.com" in poster_bg_img:
             poster_bg_img = DEFAULT_LOC_IMG
         other_locs_str = " • ".join([f"{x.get('name', '')} ({len(x.get('voters', []))} phiếu)" for x in sorted_locs[1:]])
-    else:
+        else:
         top_loc_name = "Chưa có địa điểm bình chọn"
         top_loc_desc = ""
         top_loc_votes = 0
         poster_bg_img = str(trip_data.get("img", "")).strip() or DEFAULT_TRIP_IMG
         other_locs_str = ""
-            import base64
+
+    import base64
     poster_bg_data_uri = poster_bg_img
     try:
         img_resp = requests.get(poster_bg_img, timeout=6)
@@ -1176,6 +1177,7 @@ with t_poster:
             poster_bg_data_uri = f"data:{ctype};base64,{b64_str}"
     except Exception:
         pass
+
 
 
     # 2. Thực đơn chốt gọn gàng đúng danh sách yêu cầu
