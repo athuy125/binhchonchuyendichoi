@@ -1270,7 +1270,7 @@ with t_poster:
     formatted_desc_html = "<br>".join([html.escape(ln if ln.startswith("•") else f"• {ln}") for ln in desc_lines])
     other_loc_html = f'<div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.15); font-size:12.5px; color:#94a3b8;">Các địa điểm tham khảo khác: {html.escape(other_locs_str)}</div>' if other_locs_str else ""
 
-    modern_poster_html = f"""
+        modern_poster_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -1296,7 +1296,7 @@ with t_poster:
         .hero-cover {{
             position: relative;
             height: 290px;
-            background-image: linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.75) 65%, #0b1120 100%), url('{html.escape(poster_bg_img)}');
+            background-image: linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.75) 65%, #0b1120 100%), url('{poster_bg_data_uri}');
             background-size: cover;
             background-position: center;
             display: flex;
@@ -1390,4 +1390,38 @@ with t_poster:
             </div>
         </div>
 
-         <script>
+        <div id="preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:9999; padding:16px; overflow-y:auto; text-align:center;">
+            <div style="color:#fbbf24; font-weight:800; font-size:15px; margin-bottom:10px;">👇 NHẤN GIỮ VÀO ẢNH BÊN DƯỚI ĐỂ LƯU VỀ ĐIỆN THOẠI 👇</div>
+            <img id="rendered-img" style="max-width:100%; border-radius:14px; border:2px solid #10b981;" />
+            <br><br>
+            <button onclick="document.getElementById('preview-modal').style.display='none'" style="background:#ef4444; color:white; border:none; padding:10px 24px; border-radius:10px; font-weight:800; font-size:14px;">✖ Đóng lại</button>
+        </div>
+
+        <script>
+        function downloadPoster() {{
+            const btn = document.querySelector(".dl-btn");
+            btn.innerText = "⏳ ĐANG TẠO ẢNH CHẤT LƯỢNG CAO...";
+            const target = document.getElementById("poster-capture");
+            html2canvas(target, {{ scale: 2, backgroundColor: "#0b1120", logging: false }}).then(canvas => {{
+                const dataUrl = canvas.toDataURL("image/png");
+                btn.innerText = "📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)";
+
+                const link = document.createElement("a");
+                link.download = "Poster_Ke_Hoach_Doi.png";
+                link.href = dataUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                document.getElementById("rendered-img").src = dataUrl;
+                document.getElementById("preview-modal").style.display = "block";
+            }}).catch(err => {{
+                btn.innerText = "📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)";
+                alert("Có lỗi tạo ảnh, bạn hãy chụp màn hình tấm Poster bên dưới nhé!");
+            }});
+        }}
+        </script>
+    </body>
+    </html>
+    """
+    components.html(modern_poster_html, height=1420, scrolling=True)
