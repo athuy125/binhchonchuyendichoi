@@ -76,17 +76,6 @@ def now_vn() -> datetime.datetime:
 def make_hash(text: str) -> str:
     return hashlib.sha256(str(text).encode("utf-8")).hexdigest()
 
-def get_device_sig() -> str:
-    try:
-        hdrs = st.context.headers
-        ua = str(hdrs.get("User-Agent", "")).strip()
-        lang = str(hdrs.get("Accept-Language", "")).strip()
-        if ua:
-            return make_hash(f"{ua}|{lang}")[:24]
-    except Exception:
-        pass
-    return ""
-
 def send_external_push(data_dict: dict, clean_msg: str):
     cfg = data_dict.get("config", {})
     discord_url = cfg.get("discord_webhook", "").strip()
@@ -135,7 +124,7 @@ def trigger_browser_push(notif_item):
     components.html(js_code, height=0)
 @st.cache_data(ttl=10, show_spinner=False)
 def load_cloud() -> dict:
-    default = {"users": {}, "sessions": {}, "device_sessions": {}, "trips": {}, "notifications": [], "config": {}}
+    default = {"users": {}, "sessions": {}, "trips": {}, "notifications": [], "config": {}}
     try:
         latest_url = "/".join([API_URL, "latest"])
         r = requests.get(latest_url, headers=HEADERS, timeout=10)
@@ -145,7 +134,6 @@ def load_cloud() -> dict:
             if isinstance(record, dict):
                 default["users"] = record.get("users", {})
                 default["sessions"] = record.get("sessions", {})
-                default["device_sessions"] = record.get("device_sessions", {})
                 default["notifications"] = record.get("notifications", [])
                 default["config"] = record.get("config", {})
                 trips = record.get("trips", {})
@@ -179,7 +167,7 @@ def save_cloud(data: dict) -> bool:
         st.error(f"Lỗi mạng: {e}")
         return False
 
-cookie_manager = stx.CookieManager(key="team_auth_cookie_100")
+cookie_manager = stx.CookieManager(key="team_auth_cookie_lq21")
 
 if "user" not in st.session_state:
     st.session_state.user = None
@@ -187,45 +175,42 @@ if "selected_trip" not in st.session_state:
     st.session_state.selected_trip = None
 if "active_token" not in st.session_state:
     st.session_state.active_token = ""
-if "boot_wait" not in st.session_state:
-    st.session_state.boot_wait = 0
 
 db = load_cloud()
-dev_sig = get_device_sig()
+
 if st.session_state.user is None:
-    url_tk = st.query_params.get("token", "").strip()
-    ck_tk = cookie_manager.get("team_trip_session_100")
-
-    if not url_tk and not ck_tk and st.session_state.boot_wait < 1:
-        st.session_state.boot_wait += 1
-        st.info("⏳ Đang tự động khôi phục phiên đăng nhập...")
-        time.sleep(0.8)
-        st.rerun()
-
-    found_tk = url_tk or ck_tk
-    auto_user = ""
+    url_tk = st.query_params.get("token", "")
+    ck_tk = cookie_manager.get("team_trip_session_lq21")
+    found_tk = ck_tk or url_tk
 
     if found_tk and found_tk in db.get("sessions", {}):
-        cand_user = db["sessions"][found_tk]
-        if cand_user in db.get("users", {}):
-            auto_user = cand_user
-
-    if not auto_user and dev_sig:
-        dev_map = db.get("device_sessions", {})
-        if dev_sig in dev_map:
-            cand_user = dev_map[dev_sig]
-            if cand_user in db.get("users", {}):
-                auto_user = cand_user
-                found_tk = found_tk or secrets.token_hex(16)
-
-    if auto_user:
-        st.session_state.user = auto_user
-        st.session_state.active_token = found_tk
-        if st.query_params.get("token", "") != found_tk:
-            st.query_params["token"] = found_tk
-        exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-        cookie_manager.set("team_trip_session_100", found_tk, expires_at=exp_d)
-        st.rerun()
+        auto_user = db["sessions"][found_tk]
+        if auto_user in db.get("users", {}):
+            st.session_state.user = auto_user
+            st.session_state.active_token = found_tk
+            if st.query_params.get("token", "") != found_tk:
+                st.query_params["token"] = found_tk
+            exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
+            cookie_manager.set("team_trip_session_lq21", found_tk, expires_at=exp_d)
+            st.rerun()
+    elif not url_tk:
+        components.html(
+            """
+            <script>
+            try {
+                const savedTk = window.parent.localStorage.getItem("team_trip_lq21_token");
+                if (savedTk && savedTk.length > 10) {
+                    const parentUrl = new URL(window.parent.location.href);
+                    if (parentUrl.searchParams.get("token") !== savedTk) {
+                        parentUrl.searchParams.set("token", savedTk);
+                        window.parent.location.replace(parentUrl.toString());
+                    }
+                }
+            } catch (e) {}
+            </script>
+            """,
+            height=0,
+        )
 if st.session_state.user is None:
     AUTH_HTML = '<div class="hero-banner" style="text-align: center;"><h2 style="margin:0;">⛺ CỔNG THÀNH VIÊN ĐỘI</h2><p style="margin:8px 0 0 0; opacity: 0.9;">Đăng ký tài khoản mới (lần đầu) hoặc đăng nhập để tham gia các chuyến đi của đội</p></div>'
     st.markdown(AUTH_HTML, unsafe_allow_html=True)
@@ -235,7 +220,7 @@ if st.session_state.user is None:
         with st.form("login_box"):
             name = st.text_input("Tên của bạn", placeholder="Nhập tên đã đăng ký...").strip()
             pwd = st.text_input("Mật khẩu", type="password", placeholder="Nhập mật khẩu...")
-            st.caption("🔒 Hệ thống tự động ghi nhớ thiết bị này vĩnh viễn sau khi vào.")
+            st.caption("🔒 Hệ thống tự động ghi nhớ đăng nhập vĩnh viễn trên thiết bị này sau khi vào.")
             if st.form_submit_button("🚀 Vào Hệ Thống", use_container_width=True):
                 if not name or not pwd:
                     st.warning("Vui lòng nhập đủ tên và mật khẩu!")
@@ -249,11 +234,9 @@ if st.session_state.user is None:
                     else:
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = name
-                        if dev_sig:
-                            fresh_db.setdefault("device_sessions", {})[dev_sig] = name
                         save_cloud(fresh_db)
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_100", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_lq21", new_tk, expires_at=exp_date)
                         st.query_params["token"] = new_tk
                         st.session_state.active_token = new_tk
                         st.session_state.user = name
@@ -265,7 +248,7 @@ if st.session_state.user is None:
             r_name = st.text_input("Tên hiển thị của bạn", placeholder="Ví dụ: Huy Đỗ...").strip()
             r_pwd = st.text_input("Tạo mật khẩu", type="password")
             r_pwd2 = st.text_input("Nhập lại mật khẩu", type="password")
-            st.caption("🔒 Tài khoản và thiết bị của bạn sẽ được ghi nhớ vĩnh viễn.")
+            st.caption("🔒 Tài khoản sẽ được lưu trực tuyến và tự động ghi nhớ trên thiết bị này.")
             if st.form_submit_button("✅ Đăng Ký & Lưu Online", use_container_width=True):
                 if not r_name or not r_pwd:
                     st.warning("Không được để trống tên hoặc mật khẩu!")
@@ -280,10 +263,8 @@ if st.session_state.user is None:
                         fresh_db["users"][r_name] = make_hash(r_pwd)
                         new_tk = secrets.token_hex(16)
                         fresh_db.setdefault("sessions", {})[new_tk] = r_name
-                        if dev_sig:
-                            fresh_db.setdefault("device_sessions", {})[dev_sig] = r_name
                         exp_date = datetime.datetime.now() + datetime.timedelta(days=365)
-                        cookie_manager.set("team_trip_session_100", new_tk, expires_at=exp_date)
+                        cookie_manager.set("team_trip_session_lq21", new_tk, expires_at=exp_date)
                         add_log(fresh_db, f"🎉 Thành viên mới **{r_name}** vừa đăng ký gia nhập đội!", True)
                         if save_cloud(fresh_db):
                             st.query_params["token"] = new_tk
@@ -298,14 +279,23 @@ db = load_cloud()
 me = st.session_state.user
 is_admin = (me.strip().lower() == "athuy125")
 
-cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_100")
+cur_session_tk = st.session_state.get("active_token") or st.query_params.get("token", "") or cookie_manager.get("team_trip_session_lq21")
 if cur_session_tk:
-    st.session_state.active_token = cur_session_tk
     if st.query_params.get("token", "") != cur_session_tk:
         st.query_params["token"] = cur_session_tk
+    components.html(
+        f"""
+        <script>
+        try {{
+            window.parent.localStorage.setItem("team_trip_lq21_token", "{cur_session_tk}");
+        }} catch (e) {{}}
+        </script>
+        """,
+        height=0,
+    )
     if not st.session_state.get("cookie_refreshed"):
         exp_d = datetime.datetime.now() + datetime.timedelta(days=365)
-        cookie_manager.set("team_trip_session_100", cur_session_tk, expires_at=exp_d)
+        cookie_manager.set("team_trip_session_lq21", cur_session_tk, expires_at=exp_d)
         st.session_state.cookie_refreshed = True
 
 need_deadline_save = False
@@ -344,22 +334,30 @@ with col_b:
         st.rerun()
 with col_c:
     if st.button("Thoát", use_container_width=True):
-        load_cloud.clear()
-        clean_db = load_cloud()
-        if cur_session_tk and cur_session_tk in clean_db.get("sessions", {}):
-            del clean_db["sessions"][cur_session_tk]
-        if dev_sig and dev_sig in clean_db.get("device_sessions", {}):
-            del clean_db["device_sessions"][dev_sig]
-        save_cloud(clean_db)
-        try:
-            cookie_manager.delete("team_trip_session_100")
-        except Exception:
-            pass
+        if cur_session_tk:
+            load_cloud.clear()
+            clean_db = load_cloud()
+            if cur_session_tk in clean_db.get("sessions", {}):
+                del clean_db["sessions"][cur_session_tk]
+                save_cloud(clean_db)
+            try:
+                cookie_manager.delete("team_trip_session_lq21")
+            except Exception:
+                pass
+        components.html(
+            """
+            <script>
+            try {
+                window.parent.localStorage.removeItem("team_trip_lq21_token");
+            } catch (e) {}
+            </script>
+            """,
+            height=0,
+        )
         time.sleep(0.5)
         st.query_params.clear()
         st.session_state.active_token = ""
         st.session_state.cookie_refreshed = False
-        st.session_state.boot_wait = 0
         st.session_state.user = None
         st.session_state.selected_trip = None
         st.rerun()
@@ -592,7 +590,7 @@ if is_admin:
                     if save_cloud(current_db):
                         st.success("Đã cập nhật thông tin chuyến đi!")
                         st.rerun()
-t_loc, t_food, t_req, t_mem = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🍽️ Bình Chọn Thức Ăn", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên"])
+t_loc, t_food, t_req, t_mem, t_poster = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🍽️ Bình Chọn Thức Ăn", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên", "📜 Xuất Poster"])
 
 with t_loc:
     dl_str = trip_data.get("vote_deadline", "")
@@ -1083,6 +1081,7 @@ with t_req:
                                         add_log(current_db, f"🗑️ **{me}** đã xóa mục **{del_t}** (*{cur_trip}*).")
                                         if save_cloud(current_db):
                                             st.rerun()
+
                         with st.expander("🖼️ Gắn ảnh / Sửa mục"):
                             with st.form(f"edit_req_{cur_trip}_{i}"):
                                 er_task = st.text_input("Tên đồ dùng", value=req.get("task", ""))
@@ -1131,6 +1130,7 @@ with t_mem:
                             st.rerun()
             else:
                 st.caption("Không có thành viên nào khác để xóa.")
+
     if len(all_members) == 0:
         st.info("Chưa có thành viên nào đăng ký.")
     else:
@@ -1144,3 +1144,241 @@ with t_mem:
 
             card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
             st.markdown(card_html, unsafe_allow_html=True)
+with t_poster:
+    st.markdown("### 📜 POSTER TỔNG HỢP THÔNG TIN CHUYẾN ĐI")
+    st.caption("Tự động tổng hợp dữ liệu mới nhất từ máy chủ để xuất ảnh gửi nhóm và thông báo cho toàn đội.")
+
+    locs_all = trip_data.get("locations", [])
+    if locs_all:
+        sorted_locs = sorted(locs_all, key=lambda x: len(x.get("voters", [])), reverse=True)
+        top_loc = sorted_locs
+        top_loc_name = top_loc.get("name", "Chưa xác định")
+        top_loc_desc = top_loc.get("desc", "")
+        top_loc_votes = len(top_loc.get("voters", []))
+        poster_bg_img = str(top_loc.get("img", "")).strip()
+        if not poster_bg_img.startswith("http") or "unsplash.com" in poster_bg_img:
+            poster_bg_img = DEFAULT_LOC_IMG
+        other_locs_str = ", ".join([f"{x.get('name', '')} ({len(x.get('voters', []))} phiếu)" for x in sorted_locs[1:]])
+    else:
+        top_loc_name = "Chưa có địa điểm bình chọn"
+        top_loc_desc = ""
+        top_loc_votes = 0
+        poster_bg_img = str(trip_data.get("img", "")).strip() or DEFAULT_TRIP_IMG
+        other_locs_str = ""
+
+    preset_menu = [
+        "Sườn nướng",
+        "Bò kho",
+        "Gà nướng",
+        "Chả nướng - cá viên chiên các loại",
+        "Cơm cuộn",
+        "Nước ngọt Coca",
+        "Nước suối",
+    ]
+    server_foods = trip_data.get("foods", [])
+    final_menu_items = list(preset_menu)
+    for f_obj in server_foods:
+        fname = str(f_obj.get("name", "")).strip()
+        if fname and not any(fname.lower() == existing.lower() for existing in final_menu_items):
+            final_menu_items.append(fname)
+
+    menu_pills_html = "".join(
+        [
+            f'<span style="display:inline-block; background:rgba(245,158,11,0.22); border:1px solid #fbbf24; color:#fef3c7; padding:5px 12px; border-radius:20px; font-size:13.5px; font-weight:700; margin:4px;">🍽️ {html.escape(m)}</span>'
+            for m in final_menu_items
+        ]
+    )
+    reqs_all = trip_data.get("requirements", [])
+    contributed_list = []
+    unassigned_list = []
+
+    for r_obj in reqs_all:
+        r_task = str(r_obj.get("task", "")).strip()
+        r_note = str(r_obj.get("qty_note", "")).strip()
+        r_who = str(r_obj.get("assigned", "")).strip()
+        is_empty_who = (not r_who) or (r_who in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"])
+        if is_empty_who:
+            unassigned_list.append((r_task, r_note))
+        else:
+            contributed_list.append((r_task, r_who, r_note))
+
+    if contributed_list:
+        has_who_html = "".join(
+            [
+                f'<div style="background:rgba(6,78,59,0.72); border-left:4px solid #34d399; padding:7px 10px; border-radius:6px; margin-bottom:6px; font-size:13.5px;"><b style="color:#ffffff;">{html.escape(t)}</b><br><span style="color:#6ee7b7; font-weight:700;">🙋‍♂️ Người góp: {html.escape(w)}</span></div>'
+                for t, w, n in contributed_list
+            ]
+        )
+    else:
+        has_who_html = '<div style="color:#cbd5e1; font-style:italic; font-size:13px;">Chưa có mục nào được nhận góp.</div>'
+
+    if unassigned_list:
+        no_who_html = "".join(
+            [
+                f'<div style="background:rgba(127,29,29,0.72); border-left:4px solid #f87171; padding:7px 10px; border-radius:6px; margin-bottom:6px; font-size:13.5px;"><b style="color:#ffffff;">{html.escape(t)}</b>'
+                + (f'<br><span style="color:#fecaca; font-size:12px;">📝 {html.escape(n)}</span>' if n else "")
+                + "</div>"
+                for t, n in unassigned_list
+            ]
+        )
+    else:
+        no_who_html = '<div style="color:#6ee7b7; font-weight:700; font-size:13.5px;">🎉 Tất cả đồ dùng đều đã có người nhận!</div>'
+
+    if is_admin:
+        if st.button("📢 GỬI THÔNG BÁO TỔNG KẾT NÀY ĐẾN TOÀN ĐỘI", type="primary", use_container_width=True):
+            load_cloud.clear()
+            current_db = load_cloud()
+            summary_msg = (
+                f"📢 **CHỐT KẾ HOẠCH {cur_trip.upper()}**\n"
+                f"📍 Địa điểm dẫn đầu: **{top_loc_name}** ({top_loc_votes} phiếu)\n"
+                f"🍽️ Thực đơn: {', '.join(final_menu_items)}\n"
+                f"🎒 Đồ dùng: {len(contributed_list)} món đã có người góp, còn {len(unassigned_list)} món chưa có người nhận!"
+            )
+            add_log(current_db, summary_msg, True)
+            if save_cloud(current_db):
+                st.success("✅ Đã gửi thông báo tổng kết lên Bảng Thông Báo & Discord/Telegram của đội!")
+    trip_desc_clean = html.escape(trip_data.get("desc", "").strip() or "Kế hoạch dã ngoại tập thể của toàn đội.")
+    other_loc_block = f'<div style="font-size:12.5px; color:#cbd5e1; margin-top:4px;"><i>Các địa điểm khác: {html.escape(other_locs_str)}</i></div>' if other_locs_str else ""
+
+    poster_component_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <link href="https://googleapis.com" rel="stylesheet">
+    <script src="https://cloudflare.com"></script>
+    <style>
+        * {{ box-sizing: border-box; font-family: 'Be Vietnam Pro', sans-serif; }}
+        body {{ margin: 0; padding: 8px; background: transparent; color: #ffffff; }}
+        .poster-wrap {{
+            position: relative;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 3px solid #f59e0b;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.75);
+            background-image: linear-gradient(180deg, rgba(9, 13, 22, 0.76) 0%, rgba(15, 23, 42, 0.88) 45%, rgba(9, 13, 22, 0.96) 100%), url('{html.escape(poster_bg_img)}');
+            background-size: cover;
+            background-position: center;
+            padding: 24px 20px;
+        }}
+        .header-box {{
+            text-align: center;
+            background: linear-gradient(135deg, rgba(30, 58, 138, 0.92), rgba(15, 23, 42, 0.92));
+            border: 2px solid #38bdf8;
+            border-radius: 16px;
+            padding: 18px 16px;
+            margin-bottom: 18px;
+        }}
+        .sub-top {{ font-size: 12px; font-weight: 800; letter-spacing: 1.5px; color: #38bdf8; text-transform: uppercase; }}
+        .main-title {{ font-size: 26px; font-weight: 900; color: #fbbf24; margin: 6px 0; text-transform: uppercase; text-shadow: 0 2px 8px rgba(0,0,0,0.6); }}
+        .trip-desc {{ font-size: 14px; color: #f1f5f9; line-height: 1.5; background: rgba(0,0,0,0.35); padding: 10px 12px; border-radius: 10px; margin-top: 8px; }}
+        .sec-card {{
+            background: rgba(17, 24, 39, 0.86);
+            backdrop-filter: blur(6px);
+            border: 1.5px solid #334155;
+            border-radius: 14px;
+            padding: 15px;
+            margin-bottom: 16px;
+        }}
+        .sec-head {{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.15);
+            padding-bottom: 8px;
+        }}
+        .badge-num {{
+            background: #f59e0b;
+            color: #090d16;
+            font-weight: 900;
+            font-size: 15px;
+            padding: 3px 10px;
+            border-radius: 8px;
+        }}
+        .sec-title {{ font-size: 17px; font-weight: 800; color: #fbbf24; text-transform: uppercase; }}
+        .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }}
+        @media (max-width: 600px) {{ .grid-2 {{ grid-template-columns: 1fr; }} }}
+        .dl-btn {{
+            display: block;
+            width: 100%;
+            background: linear-gradient(135deg, #059669, #2563eb);
+            color: #ffffff;
+            border: none;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 800;
+            cursor: pointer;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+        }}
+    </style>
+    </head>
+    <body>
+        <button class="dl-btn" onclick="downloadPoster()">📸 TẢI ẢNH POSTER NÀY VỀ MÁY (GỬI ZALO / MESSENGER)</button>
+
+        <div id="poster-capture" class="poster-wrap">
+            <div class="header-box">
+                <div class="sub-top">⛺ THÔNG BÁO KẾ HOẠCH CHÍNH THỨC CỦA ĐỘI</div>
+                <div class="main-title">{html.escape(cur_trip)}</div>
+                <div class="trip-desc">📅 <b>Thông tin chuyến đi:</b> {trip_desc_clean}</div>
+            </div>
+
+            <div class="sec-card" style="border-color:#38bdf8;">
+                <div class="sec-head">
+                    <span class="badge-num" style="background:#38bdf8;">01</span>
+                    <span class="sec-title" style="color:#38bdf8;">ĐỊA ĐIỂM ĐƯỢC BÌNH CHỌN NHIỀU NHẤT</span>
+                </div>
+                <div style="font-size:20px; font-weight:900; color:#ffffff;">📍 {html.escape(top_loc_name)} <span style="background:#064e3b; color:#34d399; font-size:13px; padding:3px 10px; border-radius:12px; vertical-align:middle;">🔥 {top_loc_votes} phiếu bầu</span></div>
+                <div style="font-size:14px; color:#fde68a; margin-top:5px;">{html.escape(top_loc_desc)}</div>
+                {other_loc_block}
+            </div>
+
+            <div class="sec-card" style="border-color:#f59e0b;">
+                <div class="sec-head">
+                    <span class="badge-num">02</span>
+                    <span class="sec-title">THỰC ĐƠN ĂN UỐNG CỦA CHUYẾN ĐI</span>
+                </div>
+                <div style="line-height:1.8;">{menu_pills_html}</div>
+            </div>
+
+            <div class="sec-card" style="border-color:#10b981;">
+                <div class="sec-head">
+                    <span class="badge-num" style="background:#10b981;">03</span>
+                    <span class="sec-title" style="color:#34d399;">TỔNG HỢP ĐỒ DÙNG & PHÂN CÔNG</span>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <div style="font-size:14px; font-weight:800; color:#34d399; margin-bottom:8px;">✅ ĐÃ CÓ NGƯỜI GÓP ({len(contributed_list)} món)</div>
+                        {has_who_html}
+                    </div>
+                    <div>
+                        <div style="font-size:14px; font-weight:800; color:#f87171; margin-bottom:8px;">⚠️ CHƯA CÓ NGƯỜI GÓP ({len(unassigned_list)} món)</div>
+                        {no_who_html}
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align:center; font-size:12px; color:#94a3b8; margin-top:8px; font-weight:600;">
+                ✨ Chúc toàn đội có một chuyến đi thật vui vẻ, an toàn và gắn kết! ✨
+            </div>
+        </div>
+
+        <script>
+        function downloadPoster() {{
+            const target = document.getElementById("poster-capture");
+            html2canvas(target, {{ useCORS: true, scale: 2, backgroundColor: "#090d16" }}).then(canvas => {{
+                const link = document.createElement("a");
+                link.download = "Poster_Ke_Hoach_Doi.png";
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            }}).catch(err => {{
+                alert("Trình duyệt đang chặn tải tự động, bạn có thể chụp màn hình tấm Poster bên dưới nhé!");
+            }});
+        }}
+        </script>
+    </body>
+    </html>
+    """
+    components.html(poster_component_html, height=1020, scrolling=True)
