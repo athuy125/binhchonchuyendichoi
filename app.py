@@ -1148,12 +1148,12 @@ with t_poster:
     import base64
 
     st.markdown("### ✨ POSTER HIỆN ĐẠI — KẾ HOẠCH CHUYẾN ĐI")
-    st.caption("Giao diện Bento hiện đại, thoáng đãng. Bấm nút xanh bên dưới để tải ảnh về gửi nhóm.")
+    st.caption("Bấm nút xanh bên dưới để tải tệp Poster về máy. Tệp tải về mở trực tiếp trên mọi điện thoại & máy tính với độ nét 100%.")
 
     locs_all = trip_data.get("locations", [])
     if locs_all:
         sorted_locs = sorted(locs_all, key=lambda x: len(x.get("voters", [])), reverse=True)
-        top_loc = sorted_locs[0]
+        top_loc = sorted_locs
         top_loc_name = top_loc.get("name", "Chưa xác định")
         top_loc_desc = top_loc.get("desc", "")
         top_loc_votes = len(top_loc.get("voters", []))
@@ -1245,106 +1245,12 @@ with t_poster:
         )
     else:
         no_who_html = '<div style="color:#34d399; font-weight:700; font-size:13.5px;">🎉 Tất cả đồ dùng đều đã có người nhận!</div>'
-    if is_admin:
-        if st.button("📢 GỬI THÔNG BÁO CHỐT KẾ HOẠCH NÀY LÊN BẢNG TIN ĐỘI", type="primary", use_container_width=True):
-            load_cloud.clear()
-            current_db = load_cloud()
-            all_menu_names = [x[1] for x in final_foods + final_drinks]
-            summary_msg = (
-                f"📢 **CHỐT KẾ HOẠCH {cur_trip.upper()}**\n"
-                f"📍 Địa điểm: **{top_loc_name}** ({top_loc_votes} phiếu)\n"
-                f"🍽️ Thực đơn: {', '.join(all_menu_names)}\n"
-                f"🎒 Đồ dùng: {len(contributed_items)} nhóm món đã có người góp, còn {len(unassigned_list)} món đang kêu gọi góp thêm!"
-            )
-            add_log(current_db, summary_msg, True)
-            if save_cloud(current_db):
-                st.success("✅ Đã gửi thông báo tổng kết lên Bảng Thông Báo & Discord/Telegram!")
-
     raw_trip_desc = trip_data.get("desc", "").strip()
     desc_lines = [line.strip() for line in raw_trip_desc.replace(" - ", "\n• ").split("\n") if line.strip()]
     formatted_desc_html = "<br>".join([html.escape(ln if ln.startswith("•") else f"• {ln}") for ln in desc_lines])
     other_loc_html = f'<div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.15); font-size:12.5px; color:#94a3b8;">Các địa điểm tham khảo khác: {html.escape(other_locs_str)}</div>' if other_locs_str else ""
 
-    modern_poster_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <script src="https://jsdelivr.net"></script>
-    <style>
-        * {{ box-sizing: border-box; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
-        body {{ margin: 0; padding: 6px; background: transparent; color: #f8fafc; }}
-        .dl-btn {{
-            display: block; width: 100%; background: linear-gradient(135deg, #10b981, #0284c7);
-            color: #ffffff; border: none; padding: 14px; border-radius: 14px; font-size: 15px;
-            font-weight: 800; cursor: pointer; margin-bottom: 14px; letter-spacing: 0.3px;
-            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
-        }}
-        .poster-canvas {{
-            background: #0b1120;
-            border-radius: 24px;
-            overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.12);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-        }}
-        .hero-cover {{
-            position: relative;
-            height: 290px;
-            background-image: linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.75) 65%, #0b1120 100%), url('{poster_bg_data_uri}');
-            background-size: cover;
-            background-position: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            padding: 28px 24px 20px 24px;
-        }}
-        .eyebrow {{
-            display: inline-block; align-self: flex-start;
-            background: rgba(245, 158, 11, 0.95); color: #090d16;
-            font-size: 11.5px; font-weight: 800; padding: 5px 12px;
-            border-radius: 20px; letter-spacing: 1px; text-transform: uppercase;
-            margin-bottom: 10px;
-        }}
-        .hero-title {{
-            font-size: 30px; font-weight: 800; color: #ffffff;
-            line-height: 1.2; margin: 0 0 8px 0; letter-spacing: -0.5px;
-        }}
-        .hero-loc {{
-            display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
-            font-size: 16px; font-weight: 700; color: #fbbf24;
-        }}
-        .vote-pill {{
-            background: rgba(16, 185, 129, 0.22); border: 1px solid #10b981;
-            color: #6ee7b7; font-size: 12.5px; padding: 3px 10px; border-radius: 20px;
-        }}
-        .body-pad {{ padding: 10px 24px 28px 24px; }}
-        .bento-card {{
-            background: #131c31;
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 18px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }}
-        .sec-label {{
-            font-size: 12px; font-weight: 800; letter-spacing: 1.2px;
-            text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
-        }}
-        .menu-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
-        .contrib-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
-        @media (max-width: 560px) {{
-            .menu-grid, .contrib-grid {{ grid-template-columns: 1fr; }}
-            .hero-title {{ font-size: 24px; }}
-        }}
-    </style>
-    </head>
-    <body>
-        <button id="btn-export" class="dl-btn" onclick="downloadPoster()">📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)</button>
-
-        <div id="save-box" style="display:none; background:#064e3b; border:2px solid #10b981; border-radius:16px; padding:14px; margin-bottom:16px; text-align:center;">
-            <div style="color:#6ee7b7; font-weight:800; font-size:14px; margin-bottom:8px;">✅ ĐÃ XUẤT ẢNH THÀNH CÔNG! (Trên điện thoại hãy nhấn giữ vào ảnh dưới để Lưu)</div>
-            <img id="output-img" style="max-width:100%; border-radius:12px; border:1px solid #34d399;" />
-        </div>
-
+    poster_card_body = f"""
         <div id="poster-capture" class="poster-canvas">
             <div class="hero-cover">
                 <span class="eyebrow">⛺ KẾ HOẠCH CHÍNH THỨC CỦA ĐỘI</span>
@@ -1384,44 +1290,93 @@ with t_poster:
                 </div>
             </div>
         </div>
+    """
 
+    shared_poster_css = f"""
+        * {{ box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
+        body {{ margin: 0; padding: 12px; background: #090d16; color: #f8fafc; }}
+        .poster-canvas {{
+            max-width: 780px; margin: 0 auto;
+            background: #0b1120; border-radius: 24px; overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 20px 50px rgba(0,0,0,0.85);
+        }}
+        .hero-cover {{
+            position: relative; height: 290px;
+            background-image: linear-gradient(180deg, rgba(11,17,32,0.18) 0%, rgba(11,17,32,0.75) 65%, #0b1120 100%), url('{poster_bg_data_uri}');
+            background-size: cover; background-position: center;
+            display: flex; flex-direction: column; justify-content: flex-end; padding: 28px 24px 20px 24px;
+        }}
+        .eyebrow {{
+            display: inline-block; align-self: flex-start;
+            background: rgba(245, 158, 11, 0.95); color: #090d16;
+            font-size: 11.5px; font-weight: 800; padding: 5px 12px;
+            border-radius: 20px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px;
+        }}
+        .hero-title {{ font-size: 30px; font-weight: 800; color: #ffffff; line-height: 1.2; margin: 0 0 8px 0; }}
+        .hero-loc {{ display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 16px; font-weight: 700; color: #fbbf24; }}
+        .vote-pill {{ background: rgba(16, 185, 129, 0.22); border: 1px solid #10b981; color: #6ee7b7; font-size: 12.5px; padding: 3px 10px; border-radius: 20px; }}
+        .body-pad {{ padding: 10px 24px 28px 24px; }}
+        .bento-card {{ background: #131c31; border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 20px; margin-bottom: 20px; }}
+        .sec-label {{ font-size: 12px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }}
+        .menu-grid, .contrib-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
+        @media (max-width: 560px) {{ .menu-grid, .contrib-grid {{ grid-template-columns: 1fr; }} .hero-title {{ font-size: 24px; }} }}
+    """
+
+    standalone_file_html = f"""<!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Poster - {html.escape(cur_trip)}</title>
+        <script src="https://jsdelivr.net"></script>
+        <style>{shared_poster_css}</style>
+    </head>
+    <body>
+        <div style="max-width:780px; margin:0 auto 12px auto; text-align:center;">
+            <button onclick="saveAsPng()" style="width:100%; background:linear-gradient(135deg,#10b981,#0284c7); color:#fff; border:none; padding:14px; border-radius:14px; font-size:15px; font-weight:800; cursor:pointer;">
+                📸 LƯU THÀNH ẢNH PNG VÀO THƯ VIỆN
+            </button>
+        </div>
+        {poster_card_body}
         <script>
-        function downloadPoster() {{
-            const btn = document.getElementById("btn-export");
-            if (typeof html2canvas === "undefined") {{
-                alert("Thư viện ảnh đang tải, bạn vui lòng bấm lại sau 2 giây!");
-                return;
-            }}
-            btn.innerText = "⏳ ĐANG XUẤT ẢNH...";
-            const target = document.getElementById("poster-capture");
-            html2canvas(target, {{ scale: 2, backgroundColor: "#0b1120", logging: false }}).then(canvas => {{
-                btn.innerText = "📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)";
-                const dataUrl = canvas.toDataURL("image/png");
-
-                // Hiển thị ngay ảnh đã xuất ở đầu trang để iPhone/Zalo nhấn giữ lưu 100%
-                document.getElementById("output-img").src = dataUrl;
-                document.getElementById("save-box").style.display = "block";
-
-                // Đồng thời tải tệp PNG qua Blob URL cho máy tính & Android
-                canvas.toBlob(function(blob) {{
-                    if (blob) {{
-                        const blobUrl = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = blobUrl;
-                        a.download = "Poster_Ke_Hoach_Doi.png";
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                    }}
-                }}, "image/png");
-            }}).catch(err => {{
-                btn.innerText = "📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)";
-                alert("Không thể tự động tải trên trình duyệt này, bạn hãy chụp màn hình tấm Poster bên dưới nhé!");
+        function saveAsPng() {{
+            html2canvas(document.getElementById("poster-capture"), {{ scale: 2, backgroundColor: "#0b1120" }}).then(c => {{
+                const a = document.createElement("a");
+                a.href = c.toDataURL("image/png");
+                a.download = "Poster_Ke_Hoach_Doi.png";
+                a.click();
             }});
         }}
         </script>
     </body>
-    </html>
-    """
-    components.html(modern_poster_html, height=1450, scrolling=True)
+    </html>"""
+
+    col_act1, col_act2 = st.columns(2)
+    with col_act1:
+        st.download_button(
+            label="📥 TẢI TỆP POSTER VỀ MÁY (100% ĐƯỢC)",
+            data=standalone_file_html.encode("utf-8"),
+            file_name=f"Poster_{cur_trip.replace(' ', '_')}.html",
+            mime="text/html",
+            type="primary",
+            use_container_width=True,
+        )
+    with col_act2:
+        if is_admin:
+            if st.button("📢 GỬI THÔNG BÁO CHỐT LÊN BẢNG TIN", use_container_width=True):
+                load_cloud.clear()
+                current_db = load_cloud()
+                all_menu_names = [x for x in final_foods + final_drinks]
+                summary_msg = (
+                    f"📢 **CHỐT KẾ HOẠCH {cur_trip.upper()}**\n"
+                    f"📍 Địa điểm: **{top_loc_name}** ({top_loc_votes} phiếu)\n"
+                    f"🍽️ Thực đơn: {', '.join(all_menu_names)}\n"
+                    f"🎒 Đồ dùng: {len(contributed_items)} nhóm món đã có người góp, còn {len(unassigned_list)} món đang kêu gọi góp thêm!"
+                )
+                add_log(current_db, summary_msg, True)
+                if save_cloud(current_db):
+                    st.success("✅ Đã gửi thông báo tổng kết lên Bảng Thông Báo & Discord/Telegram!")
+
+    preview_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>{shared_poster_css}</style></head><body>{poster_card_body}</body></html>"
+    components.html(preview_html, height=1380, scrolling=True)
 
