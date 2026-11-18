@@ -1145,9 +1145,10 @@ with t_mem:
             card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
             st.markdown(card_html, unsafe_allow_html=True)
 with t_poster:
-    st.markdown("### 📜 POSTER TỔNG HỢP THÔNG TIN CHUYẾN ĐI")
-    st.caption("Tự động tổng hợp dữ liệu mới nhất từ máy chủ để xuất ảnh gửi nhóm và thông báo cho toàn đội.")
+    st.markdown("### ✨ POSTER HIỆN ĐẠI — KẾ HOẠCH CHUYẾN ĐI")
+    st.caption("Thiết kế thoáng đãng, hiện đại, tối ưu thị giác để gửi nhóm Zalo / Messenger.")
 
+    # 1. Lấy địa điểm dẫn đầu & ảnh nền rõ nét
     locs_all = trip_data.get("locations", [])
     if locs_all:
         sorted_locs = sorted(locs_all, key=lambda x: len(x.get("voters", [])), reverse=True)
@@ -1158,13 +1159,241 @@ with t_poster:
         poster_bg_img = str(top_loc.get("img", "")).strip()
         if not poster_bg_img.startswith("http") or "unsplash.com" in poster_bg_img:
             poster_bg_img = DEFAULT_LOC_IMG
-        other_locs_str = ", ".join([f"{x.get('name', '')} ({len(x.get('voters', []))} phiếu)" for x in sorted_locs[1:]])
+        other_locs_str = " • ".join([f"{x.get('name', '')} ({len(x.get('voters', []))} phiếu)" for x in sorted_locs[1:]])
     else:
         top_loc_name = "Chưa có địa điểm bình chọn"
         top_loc_desc = ""
         top_loc_votes = 0
         poster_bg_img = str(trip_data.get("img", "")).strip() or DEFAULT_TRIP_IMG
         other_locs_str = ""
+
+    # 2. Thực đơn chốt gọn gàng đúng danh sách yêu cầu
+    final_foods = [
+        ("🍖", "Sườn nướng"),
+        ("🍙", "Cơm cuộn"),
+        ("🍲", "Bò kho"),
+        ("🍢", "Cá viên chiên các loại - Chả cá"),
+        ("🍗", "Gà nướng"),
+    ]
+    final_drinks = [
+        ("🥤", "Nước ngọt Coca"),
+        ("💧", "Nước suối"),
+    ]
+
+    food_cards_html = "".join(
+        [
+            f'<div style="background:rgba(255,255,255,0.06); border:1px solid rgba(251,191,36,0.35); border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;"><span style="font-size:20px;">{ico}</span><span style="font-size:14.5px; font-weight:700; color:#f8fafc;">{html.escape(name)}</span></div>'
+            for ico, name in final_foods
+        ]
+    )
+    drink_cards_html = "".join(
+        [
+            f'<div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.4); border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;"><span style="font-size:20px;">{ico}</span><span style="font-size:14.5px; font-weight:700; color:#e0f2fe;">{html.escape(name)}</span></div>'
+            for ico, name in final_drinks
+        ]
+    )
+
+    # 3. Gộp trùng tên món đồ dùng & phân loại rành mạch
+    reqs_all = trip_data.get("requirements", [])
+    merged_has_who = {}
+    unassigned_list = []
+
+    for r_obj in reqs_all:
+        r_task = str(r_obj.get("task", "")).strip()
+        r_note = str(r_obj.get("qty_note", "")).strip()
+        r_who = str(r_obj.get("assigned", "")).strip()
+        is_empty_who = (not r_who) or (r_who in ["Chưa phân công", "Chưa có người góp", "Mọi người cùng góp"])
+        if is_empty_who:
+            unassigned_list.append((r_task, r_note))
+        else:
+            key_norm = r_task.lower()
+            if key_norm not in merged_has_who:
+                merged_has_who[key_norm] = {"title": r_task, "people": []}
+            for person in [p.strip() for p in r_who.split(",") if p.strip()]:
+                if person not in merged_has_who[key_norm]["people"]:
+                    merged_has_who[key_norm]["people"].append(person)
+
+    contributed_items = list(merged_has_who.values())
+
+    if contributed_items:
+        has_who_html = "".join(
+            [
+                f'<div style="background:rgba(16,185,129,0.09); border:1px solid rgba(16,185,129,0.28); border-radius:12px; padding:10px 12px;"><div style="font-size:14px; font-weight:800; color:#ffffff; margin-bottom:4px;">{html.escape(item["title"])}</div><div style="font-size:12.5px; font-weight:600; color:#34d399;">👤 {html.escape(", ".join(item["people"]))}</div></div>'
+                for item in contributed_items
+            ]
+        )
+    else:
+        has_who_html = '<div style="color:#94a3b8; font-size:13px;">Chưa có mục nào được nhận góp.</div>'
+
+    if unassigned_list:
+        no_who_html = "".join(
+            [
+                f'<div style="background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.4); border-radius:12px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;"><span style="font-size:14.5px; font-weight:800; color:#ffffff;">🚨 {html.escape(t)}</span>'
+                + (f'<span style="background:rgba(244,63,94,0.25); color:#fecdd3; font-size:12px; font-weight:700; padding:3px 10px; border-radius:20px;">{html.escape(n)}</span>' if n else "")
+                + "</div>"
+                for t, n in unassigned_list
+            ]
+        )
+    else:
+        no_who_html = '<div style="color:#34d399; font-weight:700; font-size:13.5px;">🎉 Tất cả đồ dùng đều đã có người nhận!</div>'
+    if is_admin:
+        if st.button("📢 GỬI THÔNG BÁO CHỐT KẾ HOẠCH NÀY LÊN BẢNG TIN ĐỘI", type="primary", use_container_width=True):
+            load_cloud.clear()
+            current_db = load_cloud()
+            all_menu_names = [x[1] for x in final_foods + final_drinks]
+            summary_msg = (
+                f"📢 **CHỐT KẾ HOẠCH {cur_trip.upper()}**\n"
+                f"📍 Địa điểm: **{top_loc_name}** ({top_loc_votes} phiếu)\n"
+                f"🍽️ Thực đơn: {', '.join(all_menu_names)}\n"
+                f"🎒 Đồ dùng: {len(contributed_items)} nhóm món đã có người góp, còn {len(unassigned_list)} món đang kêu gọi góp thêm!"
+            )
+            add_log(current_db, summary_msg, True)
+            if save_cloud(current_db):
+                st.success("✅ Đã gửi thông báo tổng kết lên Bảng Thông Báo & Discord/Telegram!")
+
+    # Tách thông tin lịch trình thành các dòng gạch đầu dòng thoáng mắt
+    raw_trip_desc = trip_data.get("desc", "").strip()
+    desc_lines = [line.strip() for line in raw_trip_desc.replace(" - ", "\n• ").split("\n") if line.strip()]
+    formatted_desc_html = "<br>".join([html.escape(ln if ln.startswith("•") else f"• {ln}") for ln in desc_lines])
+    other_loc_html = f'<div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.15); font-size:12.5px; color:#94a3b8;">Các địa điểm tham khảo khác: {html.escape(other_locs_str)}</div>' if other_locs_str else ""
+
+    modern_poster_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <link href="https://googleapis.com" rel="stylesheet">
+    <script src="https://cloudflare.com"></script>
+    <style>
+        * {{ box-sizing: border-box; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }}
+        body {{ margin: 0; padding: 6px; background: transparent; color: #f8fafc; }}
+        .dl-btn {{
+            display: block; width: 100%; background: linear-gradient(135deg, #10b981, #0284c7);
+            color: #ffffff; border: none; padding: 14px; border-radius: 14px; font-size: 15px;
+            font-weight: 800; cursor: pointer; margin-bottom: 16px; letter-spacing: 0.3px;
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }}
+        .poster-canvas {{
+            background: #0b1120;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+        }}
+        .hero-cover {{
+            position: relative;
+            height: 290px;
+            background-image: linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.75) 65%, #0b1120 100%), url('{html.escape(poster_bg_img)}');
+            background-size: cover;
+            background-position: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 28px 24px 20px 24px;
+        }}
+        .eyebrow {{
+            display: inline-block; align-self: flex-start;
+            background: rgba(245, 158, 11, 0.95); color: #090d16;
+            font-size: 11.5px; font-weight: 800; padding: 5px 12px;
+            border-radius: 20px; letter-spacing: 1px; text-transform: uppercase;
+            margin-bottom: 10px;
+        }}
+        .hero-title {{
+            font-size: 30px; font-weight: 800; color: #ffffff;
+            line-height: 1.2; margin: 0 0 8px 0; letter-spacing: -0.5px;
+        }}
+        .hero-loc {{
+            display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+            font-size: 16px; font-weight: 700; color: #fbbf24;
+        }}
+        .vote-pill {{
+            background: rgba(16, 185, 129, 0.22); border: 1px solid #10b981;
+            color: #6ee7b7; font-size: 12.5px; padding: 3px 10px; border-radius: 20px;
+        }}
+        .body-pad {{ padding: 10px 24px 28px 24px; }}
+        .bento-card {{
+            background: #131c31;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }}
+        .sec-label {{
+            font-size: 12px; font-weight: 800; letter-spacing: 1.2px;
+            text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+        }}
+        .menu-grid {{
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        }}
+        .contrib-grid {{
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+        }}
+        @media (max-width: 560px) {{
+            .menu-grid, .contrib-grid {{ grid-template-columns: 1fr; }}
+            .hero-title {{ font-size: 24px; }}
+        }}
+    </style>
+    </head>
+    <body>
+        <button class="dl-btn" onclick="downloadPoster()">📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)</button>
+
+        <div id="poster-capture" class="poster-canvas">
+            <div class="hero-cover">
+                <span class="eyebrow">⛺ KẾ HOẠCH CHÍNH THỨC CỦA ĐỘI</span>
+                <h1 class="hero-title">{html.escape(cur_trip)}</h1>
+                <div class="hero-loc">
+                    <span>📍 Điểm chốt: {html.escape(top_loc_name)}</span>
+                    <span class="vote-pill">🔥 {top_loc_votes} phiếu bầu</span>
+                </div>
+                <div style="font-size:13.5px; color:#cbd5e1; margin-top:4px;">{html.escape(top_loc_desc)}</div>
+            </div>
+
+            <div class="body-pad">
+                <div class="bento-card">
+                    <div class="sec-label" style="color:#38bdf8;"><span>🗓️</span> THÔNG TIN & LỊCH TRÌNH CHUYẾN ĐI</div>
+                    <div style="font-size:14px; color:#e2e8f0; line-height:1.75;">{formatted_desc_html}</div>
+                    {other_loc_html}
+                </div>
+
+                <div class="bento-card">
+                    <div class="sec-label" style="color:#fbbf24;"><span>🍽️</span> THỰC ĐƠN ĐÃ CHỐT (7 MÓN)</div>
+                    <div class="menu-grid" style="margin-bottom:10px;">{food_cards_html}</div>
+                    <div class="menu-grid">{drink_cards_html}</div>
+                </div>
+
+                <div class="bento-card" style="border-color:rgba(244,63,94,0.35);">
+                    <div class="sec-label" style="color:#fb7185;"><span>🚨</span> ĐỒ DÙNG ĐANG CẦN NGƯỜI GÓP ({len(unassigned_list)} MÓN)</div>
+                    <div style="display:flex; flex-direction:column; gap:8px;">{no_who_html}</div>
+                </div>
+
+                <div class="bento-card" style="margin-bottom:8px;">
+                    <div class="sec-label" style="color:#34d399;"><span>✅</span> BẢNG PHÂN CÔNG ĐÃ NHẬN GÓP ({len(contributed_items)} MỤC)</div>
+                    <div class="contrib-grid">{has_who_html}</div>
+                </div>
+
+                <div style="text-align:center; font-size:12.5px; color:#64748b; margin-top:16px; font-weight:600;">
+                    ✨ Hẹn gặp toàn đội đúng giờ — Chúc chuyến đi thật nhiều kỷ niệm đẹp! ✨
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function downloadPoster() {{
+            const target = document.getElementById("poster-capture");
+            html2canvas(target, {{ useCORS: true, scale: 2, backgroundColor: "#0b1120" }}).then(canvas => {{
+                const link = document.createElement("a");
+                link.download = "Poster_Ke_Hoach_Hien_Dai.png";
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            }}).catch(err => {{
+                alert("Bạn có thể chụp màn hình tấm Poster bên dưới để gửi vào nhóm nhé!");
+            }});
+        }}
+        </script>
+    </body>
+    </html>
+    """
+    components.html(modern_poster_html, height=1380, scrolling=True)
 
     preset_menu = [
         "Sườn nướng",
