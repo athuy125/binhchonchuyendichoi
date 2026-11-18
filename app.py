@@ -1145,10 +1145,13 @@ with t_mem:
             card_html = f'<div class="member-card"><div style="font-size: 16px; font-weight: 700; color: #38bdf8;">{idx}. 👤 {member_name}</div><div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">{vote_status} &nbsp;|&nbsp; {food_status} &nbsp;|&nbsp; {task_status}</div></div>'
             st.markdown(card_html, unsafe_allow_html=True)
 with t_poster:
-    st.markdown("### ✨ POSTER HIỆN ĐẠI — KẾ HOẠCH CHUYẾN ĐI")
-    st.caption("Thiết kế thoáng đãng, hiện đại, tối ưu thị giác để gửi nhóm Zalo / Messenger.")
+    import io
+    import os
+    from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-    # 1. Lấy địa điểm dẫn đầu & ảnh nền rõ nét
+    st.markdown("### ✨ POSTER HIỆN ĐẠI — KẾ HOẠCH CHUYẾN ĐI")
+    st.caption("Bấm nút xanh bên dưới để tải trực tiếp ảnh Poster PNG chất lượng cao về máy gửi Zalo / Messenger.")
+
     locs_all = trip_data.get("locations", [])
     if locs_all:
         sorted_locs = sorted(locs_all, key=lambda x: len(x.get("voters", [])), reverse=True)
@@ -1159,54 +1162,25 @@ with t_poster:
         poster_bg_img = str(top_loc.get("img", "")).strip()
         if not poster_bg_img.startswith("http") or "unsplash.com" in poster_bg_img:
             poster_bg_img = DEFAULT_LOC_IMG
-        other_locs_str = " • ".join([f"{x.get('name', '')} ({len(x.get('voters', []))} phiếu)" for x in sorted_locs[1:]])
     else:
         top_loc_name = "Chưa có địa điểm bình chọn"
         top_loc_desc = ""
         top_loc_votes = 0
         poster_bg_img = str(trip_data.get("img", "")).strip() or DEFAULT_TRIP_IMG
-        other_locs_str = ""
 
-    import base64
-    poster_bg_data_uri = poster_bg_img
-    try:
-        img_resp = requests.get(poster_bg_img, timeout=6)
-        if img_resp.status_code == 200:
-            b64_str = base64.b64encode(img_resp.content).decode("utf-8")
-            ctype = img_resp.headers.get("Content-Type", "image/jpeg")
-            poster_bg_data_uri = f"data:{ctype};base64,{b64_str}"
-    except Exception:
-        pass
-
-
-
-    # 2. Thực đơn chốt gọn gàng đúng danh sách yêu cầu
     final_foods = [
-        ("🍖", "Sườn nướng"),
-        ("🍙", "Cơm cuộn"),
-        ("🍲", "Bò kho"),
-        ("🍢", "Cá viên chiên các loại - Chả cá"),
-        ("🍗", "Gà nướng"),
+        "Sườn nướng",
+        "Cơm cuộn",
+        "Bò kho",
+        "Cá viên chiên các loại - Chả cá",
+        "Gà nướng",
     ]
     final_drinks = [
-        ("🥤", "Nước ngọt Coca"),
-        ("💧", "Nước suối"),
+        "Nước ngọt Coca",
+        "Nước suối",
     ]
+    all_7_menu = final_foods + final_drinks
 
-    food_cards_html = "".join(
-        [
-            f'<div style="background:rgba(255,255,255,0.06); border:1px solid rgba(251,191,36,0.35); border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;"><span style="font-size:20px;">{ico}</span><span style="font-size:14.5px; font-weight:700; color:#f8fafc;">{html.escape(name)}</span></div>'
-            for ico, name in final_foods
-        ]
-    )
-    drink_cards_html = "".join(
-        [
-            f'<div style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.4); border-radius:12px; padding:10px 14px; display:flex; align-items:center; gap:10px;"><span style="font-size:20px;">{ico}</span><span style="font-size:14.5px; font-weight:700; color:#e0f2fe;">{html.escape(name)}</span></div>'
-            for ico, name in final_drinks
-        ]
-    )
-
-    # 3. Gộp trùng tên món đồ dùng & phân loại rành mạch
     reqs_all = trip_data.get("requirements", [])
     merged_has_who = {}
     unassigned_list = []
@@ -1227,201 +1201,166 @@ with t_poster:
                     merged_has_who[key_norm]["people"].append(person)
 
     contributed_items = list(merged_has_who.values())
+    def build_poster_png():
+        W = 1080
+        raw_desc = trip_data.get("desc", "").strip()
+        desc_lines = [ln.strip().lstrip("-").strip() for ln in raw_desc.replace(" - ", "\n").split("\n") if ln.strip()]
 
-    if contributed_items:
-        has_who_html = "".join(
-            [
-                f'<div style="background:rgba(16,185,129,0.09); border:1px solid rgba(16,185,129,0.28); border-radius:12px; padding:10px 12px;"><div style="font-size:14px; font-weight:800; color:#ffffff; margin-bottom:4px;">{html.escape(item["title"])}</div><div style="font-size:12.5px; font-weight:600; color:#34d399;">👤 {html.escape(", ".join(item["people"]))}</div></div>'
-                for item in contributed_items
-            ]
+        est_h = 560 + len(desc_lines) * 34 + 340 + max(1, len(unassigned_list)) * 55 + ((len(contributed_items) + 1) // 2) * 86 + 140
+        H = max(1450, est_h)
+
+        canvas = Image.new("RGB", (W, H), "#0b1120")
+        draw = ImageDraw.Draw(canvas)
+
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        ]
+        reg_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        ]
+        f_bold_path = next((p for p in font_paths if os.path.exists(p)), None)
+        f_reg_path = next((p for p in reg_paths if os.path.exists(p)), None)
+
+        def get_font(size, bold=False):
+            path = f_bold_path if bold else f_reg_path
+            if path:
+                return ImageFont.truetype(path, size)
+            return ImageFont.load_default()
+
+        f_eyebrow = get_font(20, True)
+        f_title = get_font(44, True)
+        f_sub = get_font(26, True)
+        f_sec = get_font(21, True)
+        f_body = get_font(21, False)
+        f_bold = get_font(22, True)
+        f_small = get_font(19, False)
+
+        hero_h = 440
+        try:
+            resp = requests.get(poster_bg_img, timeout=6)
+            if resp.status_code == 200:
+                bg_img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+                bg_img = ImageOps.fit(bg_img, (W, hero_h), method=Image.Resampling.LANCZOS)
+                overlay = Image.new("RGBA", (W, hero_h), (11, 17, 32, 135))
+                bg_rgba = bg_img.convert("RGBA")
+                blended = Image.alpha_composite(bg_rgba, overlay).convert("RGB")
+                canvas.paste(blended, (0, 0))
+        except Exception:
+            draw.rectangle([0, 0, W, hero_h], fill="#1e293b")
+
+        for grad_y in range(140):
+            alpha_ratio = grad_y / 140.0
+            y_pos = hero_h - 140 + grad_y
+            col_r = int(11 * alpha_ratio + 20 * (1 - alpha_ratio))
+            col_g = int(17 * alpha_ratio + 28 * (1 - alpha_ratio))
+            col_b = int(32 * alpha_ratio + 48 * (1 - alpha_ratio))
+            draw.line([(0, y_pos), (W, y_pos)], fill=(col_r, col_g, col_b))
+
+        draw.rounded_rectangle([44, 180, 460, 222], radius=20, fill="#f59e0b")
+        draw.text((62, 190), "KẾ HOẠCH CHÍNH THỨC CỦA ĐỘI", fill="#090d16", font=f_eyebrow)
+        draw.text((44, 240), cur_trip.upper(), fill="#ffffff", font=f_title)
+        draw.text((44, 305), f"Điểm chốt: {top_loc_name}  ({top_loc_votes} phiếu bầu)", fill="#fbbf24", font=f_sub)
+        if top_loc_desc:
+            draw.text((44, 348), top_loc_desc[:75], fill="#e2e8f0", font=f_small)
+
+        cur_y = 430
+
+        def wrap_text(text, max_chars=74):
+            words = text.split()
+            lines, cur = [], ""
+            for w in words:
+                if len(cur) + len(w) + 1 <= max_chars:
+                    cur = f"{cur} {w}".strip()
+                else:
+                    lines.append(cur)
+                    cur = w
+            if cur:
+                lines.append(cur)
+            return lines or [""]
+
+        wrapped_desc = []
+        for ln in desc_lines:
+            wrapped_desc.extend(wrap_text(f"• {ln}", 76))
+        box1_h = 75 + len(wrapped_desc) * 32
+        draw.rounded_rectangle([40, cur_y, W - 40, cur_y + box1_h], radius=20, fill="#131c31", outline="#334155", width=2)
+        draw.text((64, cur_y + 20), "1. THÔNG TIN & LỊCH TRÌNH CHUYẾN ĐI", fill="#38bdf8", font=f_sec)
+        ty = cur_y + 58
+        for wln in wrapped_desc:
+            draw.text((64, ty), wln, fill="#f1f5f9", font=f_body)
+            ty += 32
+        cur_y += box1_h + 24
+
+        box2_h = 260
+        draw.rounded_rectangle([40, cur_y, W - 40, cur_y + box2_h], radius=20, fill="#131c31", outline="#f59e0b", width=2)
+        draw.text((64, cur_y + 20), "2. THỰC ĐƠN ĐÃ CHỐT (7 MÓN)", fill="#fbbf24", font=f_sec)
+        for idx_m, m_name in enumerate(all_7_menu):
+            col_i = idx_m % 2
+            row_i = idx_m // 2
+            mx = 64 + col_i * 485
+            my = cur_y + 62 + row_i * 46
+            draw.rounded_rectangle([mx, my, mx + 465, my + 38], radius=10, fill="#1e293b", outline="#fbbf24", width=1)
+            draw.text((mx + 14, my + 8), f"• {m_name}", fill="#ffffff", font=f_bold)
+        cur_y += box2_h + 24
+
+        box3_h = 75 + max(1, len(unassigned_list)) * 52
+        draw.rounded_rectangle([40, cur_y, W - 40, cur_y + box3_h], radius=20, fill="#1e1520", outline="#f43f5e", width=2)
+        draw.text((64, cur_y + 20), f"3. ĐỒ DÙNG ĐANG CẦN NGƯỜI GÓP ({len(unassigned_list)} MÓN)", fill="#fb7185", font=f_sec)
+        uy = cur_y + 60
+        if unassigned_list:
+            for u_task, u_note in unassigned_list:
+                note_part = f" ({u_note})" if u_note else ""
+                draw.text((64, uy), f"! {u_task}{note_part}"[:72], fill="#fecdd3", font=f_bold)
+                uy += 50
+        else:
+            draw.text((64, uy), "Tất cả đồ dùng đều đã có người nhận!", fill="#34d399", font=f_bold)
+        cur_y += box3_h + 24
+
+        rows_c = (len(contributed_items) + 1) // 2
+        box4_h = 75 + max(1, rows_c) * 82
+        draw.rounded_rectangle([40, cur_y, W - 40, cur_y + box4_h], radius=20, fill="#131c31", outline="#10b981", width=2)
+        draw.text((64, cur_y + 20), f"4. BẢNG PHÂN CÔNG ĐÃ NHẬN GÓP ({len(contributed_items)} MỤC)", fill="#34d399", font=f_sec)
+        for idx_c, c_obj in enumerate(contributed_items):
+            cc_col = idx_c % 2
+            cc_row = idx_c // 2
+            cx = 64 + cc_col * 485
+            cy = cur_y + 62 + cc_row * 80
+            draw.rounded_rectangle([cx, cy, cx + 465, cy + 70], radius=12, fill="#0f2922", outline="#10b981", width=1)
+            draw.text((cx + 12, cy + 10), c_obj["title"][:34], fill="#ffffff", font=f_bold)
+            draw.text((cx + 12, cy + 40), f"Góp: {', '.join(c_obj['people'])}"[:38], fill="#6ee7b7", font=f_small)
+
+        buf = io.BytesIO()
+        canvas.save(buf, format="PNG")
+        return buf.getvalue()
+
+    poster_png_bytes = build_poster_png()
+
+    col_dl1, col_dl2 = st.columns(2)
+    with col_dl1:
+        st.download_button(
+            label="📥 TẢI ẢNH POSTER PNG VỀ MÁY",
+            data=poster_png_bytes,
+            file_name=f"Poster_{cur_trip.replace(' ', '_')}.png",
+            mime="image/png",
+            type="primary",
+            use_container_width=True,
         )
-    else:
-        has_who_html = '<div style="color:#94a3b8; font-size:13px;">Chưa có mục nào được nhận góp.</div>'
+    with col_dl2:
+        if is_admin:
+            if st.button("📢 GỬI THÔNG BÁO CHỐT LÊN BẢNG TIN", use_container_width=True):
+                load_cloud.clear()
+                current_db = load_cloud()
+                summary_msg = (
+                    f"📢 **CHỐT KẾ HOẠCH {cur_trip.upper()}**\n"
+                    f"📍 Địa điểm: **{top_loc_name}** ({top_loc_votes} phiếu)\n"
+                    f"🍽️ Thực đơn: {', '.join(all_7_menu)}\n"
+                    f"🎒 Đồ dùng: {len(contributed_items)} nhóm món đã có người góp, còn {len(unassigned_list)} món đang kêu gọi góp thêm!"
+                )
+                add_log(current_db, summary_msg, True)
+                if save_cloud(current_db):
+                    st.success("✅ Đã gửi thông báo tổng kết lên Bảng Thông Báo & Discord/Telegram!")
 
-    if unassigned_list:
-        no_who_html = "".join(
-            [
-                f'<div style="background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.4); border-radius:12px; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;"><span style="font-size:14.5px; font-weight:800; color:#ffffff;">🚨 {html.escape(t)}</span>'
-                + (f'<span style="background:rgba(244,63,94,0.25); color:#fecdd3; font-size:12px; font-weight:700; padding:3px 10px; border-radius:20px;">{html.escape(n)}</span>' if n else "")
-                + "</div>"
-                for t, n in unassigned_list
-            ]
-        )
-    else:
-        no_who_html = '<div style="color:#34d399; font-weight:700; font-size:13.5px;">🎉 Tất cả đồ dùng đều đã có người nhận!</div>'
-    if is_admin:
-        if st.button("📢 GỬI THÔNG BÁO CHỐT KẾ HOẠCH NÀY LÊN BẢNG TIN ĐỘI", type="primary", use_container_width=True):
-            load_cloud.clear()
-            current_db = load_cloud()
-            all_menu_names = [x[1] for x in final_foods + final_drinks]
-            summary_msg = (
-                f"📢 **CHỐT KẾ HOẠCH {cur_trip.upper()}**\n"
-                f"📍 Địa điểm: **{top_loc_name}** ({top_loc_votes} phiếu)\n"
-                f"🍽️ Thực đơn: {', '.join(all_menu_names)}\n"
-                f"🎒 Đồ dùng: {len(contributed_items)} nhóm món đã có người góp, còn {len(unassigned_list)} món đang kêu gọi góp thêm!"
-            )
-            add_log(current_db, summary_msg, True)
-            if save_cloud(current_db):
-                st.success("✅ Đã gửi thông báo tổng kết lên Bảng Thông Báo & Discord/Telegram!")
+    st.markdown("#### 🖼️ Xem trước ảnh Poster xuất ra (Nhấn giữ vào ảnh trên điện thoại để lưu nhanh):")
+    st.image(poster_png_bytes, use_container_width=True)
 
-    # Tách thông tin lịch trình thành các dòng gạch đầu dòng thoáng mắt
-    raw_trip_desc = trip_data.get("desc", "").strip()
-    desc_lines = [line.strip() for line in raw_trip_desc.replace(" - ", "\n• ").split("\n") if line.strip()]
-    formatted_desc_html = "<br>".join([html.escape(ln if ln.startswith("•") else f"• {ln}") for ln in desc_lines])
-    other_loc_html = f'<div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.15); font-size:12.5px; color:#94a3b8;">Các địa điểm tham khảo khác: {html.escape(other_locs_str)}</div>' if other_locs_str else ""
-
-    modern_poster_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <meta charset="utf-8">
-    <link href="https://googleapis.com" rel="stylesheet">
-    <script src="https://cloudflare.com"></script>
-    <style>
-        * {{ box-sizing: border-box; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }}
-        body {{ margin: 0; padding: 6px; background: transparent; color: #f8fafc; }}
-        .dl-btn {{
-            display: block; width: 100%; background: linear-gradient(135deg, #10b981, #0284c7);
-            color: #ffffff; border: none; padding: 14px; border-radius: 14px; font-size: 15px;
-            font-weight: 800; cursor: pointer; margin-bottom: 16px; letter-spacing: 0.3px;
-            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
-        }}
-        .poster-canvas {{
-            background: #0b1120;
-            border-radius: 24px;
-            overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.12);
-            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-        }}
-        .hero-cover {{
-            position: relative;
-            height: 290px;
-            background-image: linear-gradient(180deg, rgba(11,17,32,0.2) 0%, rgba(11,17,32,0.75) 65%, #0b1120 100%), url('{poster_bg_data_uri}');
-            background-size: cover;
-            background-position: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            padding: 28px 24px 20px 24px;
-        }}
-        .eyebrow {{
-            display: inline-block; align-self: flex-start;
-            background: rgba(245, 158, 11, 0.95); color: #090d16;
-            font-size: 11.5px; font-weight: 800; padding: 5px 12px;
-            border-radius: 20px; letter-spacing: 1px; text-transform: uppercase;
-            margin-bottom: 10px;
-        }}
-        .hero-title {{
-            font-size: 30px; font-weight: 800; color: #ffffff;
-            line-height: 1.2; margin: 0 0 8px 0; letter-spacing: -0.5px;
-        }}
-        .hero-loc {{
-            display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
-            font-size: 16px; font-weight: 700; color: #fbbf24;
-        }}
-        .vote-pill {{
-            background: rgba(16, 185, 129, 0.22); border: 1px solid #10b981;
-            color: #6ee7b7; font-size: 12.5px; padding: 3px 10px; border-radius: 20px;
-        }}
-        .body-pad {{ padding: 10px 24px 28px 24px; }}
-        .bento-card {{
-            background: #131c31;
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 18px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }}
-        .sec-label {{
-            font-size: 12px; font-weight: 800; letter-spacing: 1.2px;
-            text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
-        }}
-        .menu-grid {{
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-        }}
-        .contrib-grid {{
-            display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-        }}
-        @media (max-width: 560px) {{
-            .menu-grid, .contrib-grid {{ grid-template-columns: 1fr; }}
-            .hero-title {{ font-size: 24px; }}
-        }}
-    </style>
-    </head>
-    <body>
-        <button class="dl-btn" onclick="downloadPoster()">📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)</button>
-
-        <div id="poster-capture" class="poster-canvas">
-            <div class="hero-cover">
-                <span class="eyebrow">⛺ KẾ HOẠCH CHÍNH THỨC CỦA ĐỘI</span>
-                <h1 class="hero-title">{html.escape(cur_trip)}</h1>
-                <div class="hero-loc">
-                    <span>📍 Điểm chốt: {html.escape(top_loc_name)}</span>
-                    <span class="vote-pill">🔥 {top_loc_votes} phiếu bầu</span>
-                </div>
-                <div style="font-size:13.5px; color:#cbd5e1; margin-top:4px;">{html.escape(top_loc_desc)}</div>
-            </div>
-
-            <div class="body-pad">
-                <div class="bento-card">
-                    <div class="sec-label" style="color:#38bdf8;"><span>🗓️</span> THÔNG TIN & LỊCH TRÌNH CHUYẾN ĐI</div>
-                    <div style="font-size:14px; color:#e2e8f0; line-height:1.75;">{formatted_desc_html}</div>
-                    {other_loc_html}
-                </div>
-
-                <div class="bento-card">
-                    <div class="sec-label" style="color:#fbbf24;"><span>🍽️</span> THỰC ĐƠN ĐÃ CHỐT (7 MÓN)</div>
-                    <div class="menu-grid" style="margin-bottom:10px;">{food_cards_html}</div>
-                    <div class="menu-grid">{drink_cards_html}</div>
-                </div>
-
-                <div class="bento-card" style="border-color:rgba(244,63,94,0.35);">
-                    <div class="sec-label" style="color:#fb7185;"><span>🚨</span> ĐỒ DÙNG ĐANG CẦN NGƯỜI GÓP ({len(unassigned_list)} MÓN)</div>
-                    <div style="display:flex; flex-direction:column; gap:8px;">{no_who_html}</div>
-                </div>
-
-                <div class="bento-card" style="margin-bottom:8px;">
-                    <div class="sec-label" style="color:#34d399;"><span>✅</span> BẢNG PHÂN CÔNG ĐÃ NHẬN GÓP ({len(contributed_items)} MỤC)</div>
-                    <div class="contrib-grid">{has_who_html}</div>
-                </div>
-
-                <div style="text-align:center; font-size:12.5px; color:#64748b; margin-top:16px; font-weight:600;">
-                    ✨ Hẹn gặp toàn đội đúng giờ — Chúc chuyến đi thật nhiều kỷ niệm đẹp! ✨
-                </div>
-            </div>
-        </div>
-
-        <div id="preview-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.92); z-index:9999; padding:16px; overflow-y:auto; text-align:center;">
-            <div style="color:#fbbf24; font-weight:800; font-size:15px; margin-bottom:10px;">👇 NHẤN GIỮ VÀO ẢNH BÊN DƯỚI ĐỂ LƯU VỀ ĐIỆN THOẠI 👇</div>
-            <img id="rendered-img" style="max-width:100%; border-radius:14px; border:2px solid #10b981;" />
-            <br><br>
-            <button onclick="document.getElementById('preview-modal').style.display='none'" style="background:#ef4444; color:white; border:none; padding:10px 24px; border-radius:10px; font-weight:800; font-size:14px;">✖ Đóng lại</button>
-        </div>
-
-        <script>
-        function downloadPoster() {{
-            const btn = document.querySelector(".dl-btn");
-            btn.innerText = "⏳ ĐANG TẠO ẢNH CHẤT LƯỢNG CAO...";
-            const target = document.getElementById("poster-capture");
-            html2canvas(target, {{ scale: 2, backgroundColor: "#0b1120", logging: false }}).then(canvas => {{
-                const dataUrl = canvas.toDataURL("image/png");
-                btn.innerText = "📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)";
-
-                const link = document.createElement("a");
-                link.download = "Poster_Ke_Hoach_Doi.png";
-                link.href = dataUrl;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                document.getElementById("rendered-img").src = dataUrl;
-                document.getElementById("preview-modal").style.display = "block";
-            }}).catch(err => {{
-                btn.innerText = "📸 TẢI ẢNH POSTER HIỆN ĐẠI VỀ MÁY (GỬI ZALO)";
-                alert("Có lỗi tạo ảnh, bạn hãy chụp màn hình tấm Poster bên dưới nhé!");
-            }});
-        }}
-        </script>
-    </body>
-    </html>
-    """
-    components.html(modern_poster_html, height=1420, scrolling=True)
