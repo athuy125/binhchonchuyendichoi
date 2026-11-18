@@ -1152,11 +1152,6 @@ with t_poster:
     if locs_all:
         sorted_locs = sorted(locs_all, key=lambda x: len(x.get("voters", [])), reverse=True)
         top_loc = sorted_locs[0]
-            if locs_all:
-        sorted_locs = sorted(locs_all, key=lambda x: len(x.get("voters", [])), reverse=True)
-        top_loc = sorted_locs[0]
-        top_loc_name = top_loc.get("name", "Chưa xác định")
-
         top_loc_name = top_loc.get("name", "Chưa xác định")
         top_loc_desc = top_loc.get("desc", "")
         top_loc_votes = len(top_loc.get("voters", []))
