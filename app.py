@@ -436,19 +436,22 @@ with st.expander("🔔 Bảng Thông Báo & Hoạt Động Mới Nhất Của Đ
         )
 
     if is_admin:
-        with st.form("admin_broadcast_form", clear_on_submit=True):
-            b_col1, b_col2 = st.columns([4.2, 1.4])
-            with b_col1:
-                b_msg = st.text_input("Soạn thông báo chung", placeholder="Nhập thông báo gửi tới cả đội...", label_visibility="collapsed")
-            with b_col2:
-                send_b = st.form_submit_button("📢 Gửi tin", use_container_width=True)
-            if send_b and b_msg.strip():
+    with st.expander("✏️ Chỉnh sửa thông tin / ảnh bìa chuyến đi", expanded=False):
+        with st.form(f"edit_trip_desc_form_{cur_trip}"):
+            updated_desc = st.text_area("Nội dung thông báo / lịch trình", value=trip_data.get("desc", ""), height=100)
+            updated_t_img = st.text_input("Link ảnh bìa chuyến đi", value=trip_data.get("img", DEFAULT_TRIP_IMG))
+            if st.form_submit_button("💾 Lưu thay đổi", use_container_width=True):
                 load_cloud.clear()
                 current_db = load_cloud()
-                add_log(current_db, f"📢 **THÔNG BÁO CHUNG:** {b_msg.strip()}", True)
-                if save_cloud(current_db):
-                    st.success("Đã gửi thông báo đến toàn bộ thành viên!")
-                    st.rerun()
+                if cur_trip in current_db["trips"]:
+                    current_db["trips"][cur_trip]["desc"] = updated_desc.strip()
+                    if updated_t_img.strip().startswith("http"):
+                        current_db["trips"][cur_trip]["img"] = updated_t_img.strip()
+                    add_log(current_db, f"📝 Thông tin của **{cur_trip}** vừa được cập nhật.")
+                    if save_cloud(current_db):
+                        st.success("Đã cập nhật thông tin chuyến đi!")
+                        st.rerun()
+
 
         with st.expander("⚙️ Cài đặt Discord / Telegram & Kho Ảnh Cloudinary", expanded=False):
             with st.form("webhook_cfg_form"):
