@@ -1270,7 +1270,7 @@ with t_poster:
     formatted_desc_html = "<br>".join([html.escape(ln if ln.startswith("•") else f"• {ln}") for ln in desc_lines])
     other_loc_html = f'<div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.15); font-size:12.5px; color:#94a3b8;">Các địa điểm tham khảo khác: {html.escape(other_locs_str)}</div>' if other_locs_str else ""
 
-        modern_poster_html = f"""
+    modern_poster_html = f"""
     <!DOCTYPE html>
     <html>
     <head>
