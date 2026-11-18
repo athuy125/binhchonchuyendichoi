@@ -590,7 +590,9 @@ if is_admin:
                     if save_cloud(current_db):
                         st.success("Đã cập nhật thông tin chuyến đi!")
                         st.rerun()
-t_loc, t_food, t_req, t_mem, t_poster = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🍽️ Bình Chọn Thức Ăn", "🎒 Đồ Cần Chuẩn Bị", "👥 Thành Viên", "📜 Xuất Poster"])
+t_loc, t_food, t_req, t_pay, t_mem, t_poster = st.tabs(["🗳️ Bình Chọn Địa Điểm", "🍽️ Bình Chọn Thức Ăn", "🎒 Đồ Cần Chuẩn Bị", "💰 Kiểm Kê Quỹ", "👥 Thành Viên", "📜 Xuất Poster"])
+
+
 
 with t_loc:
     dl_str = trip_data.get("vote_deadline", "")
@@ -1102,6 +1104,135 @@ with t_req:
                                             st.rerun()
 
                         st.markdown("<div style='margin-bottom:10px;'></div>", unsafe_allow_html=True)
+with t_pay:
+    st.markdown("### 💰 KIỂM KÊ CHUYỂN KHOẢN & ĐÓNG QUỸ")
+    if is_admin:
+        st.caption("👑 Chế độ Quản trị viên: Tích vào ô bên cạnh tên thành viên để xác nhận đã đóng tiền và tự động báo lên Discord.")
+    else:
+        st.caption("👀 Danh sách công khai trạng thái đóng quỹ chuyến đi (Chỉ Quản trị viên mới có quyền tích xác nhận).")
+
+    # Lấy danh sách tất cả thành viên đã đăng ký + thành viên bổ sung thủ công (nếu có)
+    registered_users = list(db.get("users", {}).keys())
+    extra_payers = trip_data.get("extra_payers", [])
+    if not isinstance(extra_payers, list):
+        extra_payers = []
+
+    all_pay_members = []
+    for u_name in registered_users + extra_payers:
+        if u_name not in all_pay_members:
+            all_pay_members.append(u_name)
+
+    paid_members = trip_data.get("paid_members", [])
+    if not isinstance(paid_members, list):
+        paid_members = []
+
+    # Cài đặt mức thu dự kiến & Thêm tên người ngoài danh sách (Chỉ Admin)
+    fee_per_person = str(trip_data.get("fee_note", "150.000đ / người")).strip()
+    if is_admin:
+        with st.expander("⚙️ Cài đặt mức thu / Thêm tên người đóng tiền ngoài danh sách", expanded=False):
+            c_fee1, c_fee2 = st.columns([3, 1.2])
+            with c_fee1:
+                new_fee_txt = st.text_input("Mức thu quỹ hiển thị", value=fee_per_person, placeholder="VD: 150.000đ / người")
+            with c_fee2:
+                st.markdown("<div style='margin-top:28px;'></div>", unsafe_allow_html=True)
+                if st.button("💾 Lưu mức thu", key="save_fee_btn", use_container_width=True):
+                    load_cloud.clear()
+                    current_db = load_cloud()
+                    current_db["trips"][cur_trip]["fee_note"] = new_fee_txt.strip()
+                    if save_cloud(current_db):
+                        st.rerun()
+
+            with st.form("add_extra_payer_form", clear_on_submit=True):
+                ep1, ep2 = st.columns([3, 1.2])
+                with ep1:
+                    ep_name = st.text_input("Thêm tên người chưa tạo tài khoản web", placeholder="VD: Bạn của Huy...")
+                with ep2:
+                    btn_ep = st.form_submit_button("➕ Thêm tên", use_container_width=True)
+                if btn_ep and ep_name.strip():
+                    clean_ep = ep_name.strip()
+                    load_cloud.clear()
+                    current_db = load_cloud()
+                    cur_ep_list = current_db["trips"][cur_trip].setdefault("extra_payers", [])
+                    if clean_ep not in cur_ep_list and clean_ep not in current_db.get("users", {}):
+                        cur_ep_list.append(clean_ep)
+                        if save_cloud(current_db):
+                            st.rerun()
+
+    # Thống kê tiến độ đóng quỹ
+    paid_count = sum(1 for m in all_pay_members if m in paid_members)
+    total_count = len(all_pay_members)
+    st.markdown(
+        f"""
+        <div style="background:linear-gradient(135deg, #064e3b, #0f172a); border:2px solid #10b981; border-radius:14px; padding:14px 18px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+                <div style="font-size:13px; color:#6ee7b7 !important; font-weight:700;">💵 MỨC THU: {html.escape(fee_per_person)}</div>
+                <div style="font-size:18px; color:#ffffff !important; font-weight:800; margin-top:2px;">✅ Đã chuyển khoản: {paid_count} / {total_count} người</div>
+            </div>
+            <div style="background:#090d16; border:1px solid #34d399; color:#34d399 !important; padding:6px 14px; border-radius:20px; font-weight:800; font-size:14px;">
+                Còn thiếu: {max(0, total_count - paid_count)} người
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if not all_pay_members:
+        st.info("Chưa có thành viên nào trong danh sách.")
+    else:
+        for idx_p, member_p in enumerate(all_pay_members, start=1):
+            is_paid = (member_p in paid_members)
+            row_bg = "#0d261e" if is_paid else "#161f33"
+            row_border = "#10b981" if is_paid else "#334155"
+            badge_html = (
+                '<span style="background:#064e3b; color:#34d399 !important; border:1px solid #10b981; padding:4px 10px; border-radius:12px; font-size:12.5px; font-weight:800;">✅ ĐÃ ĐÓNG TIỀN</span>'
+                if is_paid
+                else '<span style="background:#3f1d24; color:#fda4af !important; border:1px solid #f43f5e; padding:4px 10px; border-radius:12px; font-size:12.5px; font-weight:800;">⏳ CHƯA ĐÓNG</span>'
+            )
+
+            card_pay_html = f"""
+            <div style="background:{row_bg}; border:1.5px solid {row_border}; border-radius:12px; padding:11px 14px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+                <span style="font-size:15.5px; font-weight:800; color:#ffffff !important;">{idx_p}. 👤 {html.escape(member_p)}</span>
+                {badge_html}
+            </div>
+            """
+
+            if is_admin:
+                col_p1, col_p2 = st.columns([0.65, 5.35])
+                with col_p1:
+                    st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
+                    checked_now = st.checkbox(
+                        "Đã đóng",
+                        value=is_paid,
+                        key=f"pay_chk_{cur_trip}_{idx_p}_{member_p}",
+                        label_visibility="collapsed",
+                    )
+                    if checked_now != is_paid:
+                        load_cloud.clear()
+                        current_db = load_cloud()
+                        cur_paid_list = current_db["trips"][cur_trip].setdefault("paid_members", [])
+                        if checked_now:
+                            if member_p not in cur_paid_list:
+                                cur_paid_list.append(member_p)
+                            add_log(
+                                current_db,
+                                f"💰 **XÁC NHẬN ĐÓNG TIỀN:** **{member_p}** đã chuyển khoản thành công cho chuyến đi *{cur_trip}*! ({len(cur_paid_list)}/{total_count} người đã đóng)",
+                                True,
+                            )
+                        else:
+                            if member_p in cur_paid_list:
+                                cur_paid_list.remove(member_p)
+                            add_log(
+                                current_db,
+                                f"↩️ **CẬP NHẬT QUỸ:** Đã hoàn tác trạng thái đóng tiền của **{member_p}** trong *{cur_trip}*.",
+                                False,
+                            )
+                        if save_cloud(current_db):
+                            st.rerun()
+                with col_p2:
+                    st.markdown(card_pay_html, unsafe_allow_html=True)
+            else:
+                st.markdown(card_pay_html, unsafe_allow_html=True)
+
 with t_mem:
     all_members = list(db["users"].keys())
     st.subheader(f"👥 Danh sách thành viên đội ({len(all_members)} người)")
