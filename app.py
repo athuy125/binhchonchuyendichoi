@@ -1160,7 +1160,7 @@ with t_poster:
         if not poster_bg_img.startswith("http") or "unsplash.com" in poster_bg_img:
             poster_bg_img = DEFAULT_LOC_IMG
         other_locs_str = " • ".join([f"{x.get('name', '')} ({len(x.get('voters', []))} phiếu)" for x in sorted_locs[1:]])
-        else:
+    else:
         top_loc_name = "Chưa có địa điểm bình chọn"
         top_loc_desc = ""
         top_loc_votes = 0
